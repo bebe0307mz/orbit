@@ -155,7 +155,7 @@ See, for `--agent`:
 4. rebroadcast identical signed tx 3         RPC returned the original outcome of <hash> (same tx, no new receipt); vault counters unchanged
 ```
 
-For `--burst` (registers a fresh agent with a $0.25 daily limit and a 3 NEAR key allowance): 20 lines, then `burst result: 5 paid, 15 over_agent_daily_limit`. Each run writes `harness/out/testnet-attack-<utc>/summary.json` with the checks and transaction links.
+For `--burst` (registers a fresh agent with a $0.25 daily limit and a 3 NEAR key allowance): 20 lines, then `burst result: 5 paid, 15 rejected (15 over_agent_daily_limit), 0 not_executed, 0 unknown; ring matches`. Every attempt is classified against the vault's outcome ring; occasionally a testnet node drops one transaction before inclusion, which shows as `1 not_executed` with 14 rejected (it never reached the vault, so the ring has no entry for it). Each run writes `harness/out/testnet-attack-<utc>/summary.json` with the checks and transaction links.
 
 ### 8. Pause from the dashboard
 

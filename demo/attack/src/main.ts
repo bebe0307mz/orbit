@@ -172,7 +172,7 @@ export async function once(cfg: AttackConfig, name: string): Promise<PayOutcome>
   return o;
 }
 
-export async function burst(cfg: AttackConfig, opts: { count?: number; amount?: number; daily?: number; allowanceNear?: number } = {}): Promise<{ paid: number; reasons: Record<string, number>; other: number }> {
+export async function burst(cfg: AttackConfig, opts: { count?: number; amount?: number; daily?: number; allowanceNear?: number } = {}): Promise<BurstReport> {
   const count = opts.count ?? 20;
   const amount = opts.amount ?? 50_000;
   const daily = opts.daily ?? 250_000;
@@ -189,23 +189,70 @@ export async function burst(cfg: AttackConfig, opts: { count?: number; amount?: 
   const agent = agentFor(cfg, name, count);
   const deadline = Date.now() + 180_000;
   const outs = await Promise.all(Array.from({ length: count }, () => agent.pay({ payment_id: pid(), merchant: cfg.merchant, amount: String(amount), deadline_ms: deadline })));
-  const reasons: Record<string, number> = {};
-  let paid = 0;
-  let other = 0;
-  outs.forEach((o, i) => {
-    line(cfg, `  #${String(i + 1).padStart(2)}`, o);
-    cfg.proof?.tx(`burst ${name} #${i + 1} $0.05`, o);
-    if (o.status === 'paid') paid++;
-    else if (o.status === 'rejected' && o.reason) reasons[o.reason] = (reasons[o.reason] ?? 0) + 1;
-    else other++;
+  return classifyBurst(cfg, agent, Number(reg.value), name, outs, deadline, { count, amount, daily });
+}
+
+export interface BurstReport {
+  paid: number;
+  rejected: number;
+  not_executed: number;
+  unknown: number;
+  reasons: Record<string, number>;
+  ring_ok: boolean;
+}
+
+/**
+ * Classifies every attempt as paid / rejected / not_executed / unknown, resolving unknowns first, and cross-checks
+ * the vault ring: the ring must hold exactly one outcome per paid or rejected attempt of this agent and none for a
+ * not_executed attempt. A rejection stores no payment, so the ring (not payment(id)) is the authority for it.
+ */
+export async function classifyBurst(
+  cfg: AttackConfig, agent: OrbitAgent, agentId: number, name: string, outs: PayOutcome[], deadline: number,
+  p: { count: number; amount: number; daily: number },
+): Promise<BurstReport> {
+  const resolved: PayOutcome[] = [];
+  for (const o of outs) resolved.push(o.status === 'unknown' ? await agent.resolve(o.payment_id, o.tx_hash, deadline) : o);
+  const s = await cfg.rpc.view<{ counts: { next_seq: number } }>(cfg.vault, 'state');
+  const ring = new Map<string, { kind: string; reason: string | null; seq: number }>();
+  for (let from = Math.max(0, s.counts.next_seq - 256); from < s.counts.next_seq; ) {
+    const o = await cfg.rpc.view<{ entries: { seq: number; kind: string; agent_id: number; payment_id: string; reason: string | null }[] }>(cfg.vault, 'outcomes', { from_seq: from, limit: 100 });
+    if (!o.entries.length) break;
+    for (const e of o.entries) if (e.agent_id === agentId) ring.set(e.payment_id, { kind: e.kind, reason: e.reason, seq: e.seq });
+    from = o.entries[o.entries.length - 1]!.seq + 1;
+  }
+  const cls: { o: PayOutcome; c: 'paid' | 'rejected' | 'not_executed' | 'unknown' | 'failed' }[] = resolved.map((o) => {
+    const r = ring.get(o.payment_id);
+    if (r) return { o: { ...o, status: r.kind as PayOutcome['status'], reason: r.reason, seq: r.seq }, c: r.kind as 'paid' | 'rejected' | 'failed' };
+    if (o.status === 'not_executed' || o.status === 'expired_unpaid') return { o, c: 'not_executed' };
+    return { o, c: 'unknown' }; // still unknown, or a claimed outcome the ring does not show
   });
+  const count = (k: string) => cls.filter((x) => x.c === k).length;
+  const reasons: Record<string, number> = {};
+  cls.forEach(({ o, c }, i) => {
+    line(cfg, `  #${String(i + 1).padStart(2)} [${c}]`, o);
+    cfg.proof?.tx(`burst ${name} #${i + 1} $0.05 [${c}]`, o);
+    if (c === 'rejected' && o.reason) reasons[o.reason] = (reasons[o.reason] ?? 0) + 1;
+  });
+  const rep: BurstReport = {
+    paid: count('paid'), rejected: count('rejected'), not_executed: count('not_executed'), unknown: count('unknown') + count('failed'), reasons,
+    ring_ok: ring.size === count('paid') + count('rejected') && cls.every(({ o, c }) => (c === 'not_executed') === !ring.has(o.payment_id)),
+  };
+  const want = p.daily / p.amount;
   const summary = Object.entries(reasons).map(([r, n]) => `${n} ${r}`).join(', ');
-  cfg.out(`burst result: ${paid} paid, ${summary || '0 rejected'}${other ? `, ${other} other` : ''}`);
-  const a = (await cfg.rpc.view<{ agents: { id: number; spent_today: string; reserved: string }[] }>(cfg.vault, 'state')).agents.find((x) => x.id === Number(reg.value));
-  cfg.proof?.check(`burst: exactly ${daily / amount} of ${count} paid`, paid === daily / amount, `${paid} paid`);
-  cfg.proof?.check(`burst: ${count - daily / amount} rejected over_agent_daily_limit`, reasons.over_agent_daily_limit === count - daily / amount && other === 0, summary);
-  cfg.proof?.check('burst agent spent_today equals its daily limit', a?.spent_today === String(daily) && a?.reserved === '0', `spent ${a?.spent_today} reserved ${a?.reserved}`);
-  return { paid, reasons, other };
+  cfg.out(`burst result: ${rep.paid} paid, ${rep.rejected} rejected (${summary || 'none'}), ${rep.not_executed} not_executed, ${rep.unknown} unknown; ring ${rep.ring_ok ? 'matches' : 'MISMATCH'}`);
+  const a = (await cfg.rpc.view<{ agents: { id: number; spent_today: string; reserved: string }[] }>(cfg.vault, 'state')).agents.find((x) => x.id === agentId);
+  cfg.proof?.check(`burst: exactly ${want} paid`, rep.paid === want, `${rep.paid} paid`);
+  cfg.proof?.check(`burst: paid + rejected + not_executed == ${p.count}, unknown 0`, rep.paid + rep.rejected + rep.not_executed === p.count && rep.unknown === 0, `${rep.paid} + ${rep.rejected} + ${rep.not_executed}, unknown ${rep.unknown}`);
+  cfg.proof?.check('burst: every rejection is over_agent_daily_limit', rep.rejected === (reasons.over_agent_daily_limit ?? 0), summary || 'none');
+  cfg.proof?.check('burst: not_executed attempts (never reached the vault)', true, `${rep.not_executed}`);
+  cfg.proof?.check('burst: ring holds exactly the paid and rejected attempts', rep.ring_ok, `${ring.size} ring outcomes for agent ${agentId}`);
+  cfg.proof?.check('burst agent spent_today equals its daily limit', a?.spent_today === String(p.daily) && a?.reserved === '0', `spent ${a?.spent_today} reserved ${a?.reserved}`);
+  return rep;
+}
+
+/** Pass rule for a burst: exactly daily/amount paid, every attempt classified, ring consistent. */
+export function burstOk(r: BurstReport, count = 20, want = 5): boolean {
+  return r.paid === want && r.paid + r.rejected + r.not_executed === count && r.unknown === 0 && r.ring_ok && r.rejected === (r.reasons.over_agent_daily_limit ?? 0);
 }
 
 async function main(argv: string[]): Promise<number> {
@@ -233,7 +280,7 @@ async function main(argv: string[]): Promise<number> {
     if (flag('burst')) {
       const r = await burst(cfg);
       await cfg.proof?.write(cfg, 'Attack proof: 20-payment burst (demo/attack --burst)');
-      return r.paid === 5 && r.reasons.over_agent_daily_limit === 15 ? 0 : 1;
+      return burstOk(r) ? 0 : 1;
     }
     if (!flag('agent') || !agentName || !/^[a-z0-9-]{1,32}$/.test(agentName)) {
       console.error('usage: demo:attack --agent <name> [--once] | --burst');

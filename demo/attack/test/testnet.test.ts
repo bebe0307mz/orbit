@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { afterAll, describe, expect, it } from 'vitest';
 import { NearRpc } from '@orbit/agent';
-import { attack, burst, ProofRecorder, type AttackConfig } from '../src/main.ts';
+import { attack, burst, burstOk, ProofRecorder, type AttackConfig } from '../src/main.ts';
 
 const live = process.env.ORBIT_TESTNET === '1';
 const e = (k: string) => process.env[k] ?? '';
@@ -31,6 +31,11 @@ describe.skipIf(!live)('testnet attack', () => {
 
   it('burst: exactly 5 of 20 concurrent $0.05 pays against $0.25 (T-13)', async () => {
     const r = await burst(cfg);
-    expect(r).toEqual({ paid: 5, reasons: { over_agent_daily_limit: 15 }, other: 0 });
+    console.log('burst classification', JSON.stringify(r));
+    expect(r.paid).toBe(5);
+    expect(r.unknown).toBe(0);
+    expect(r.paid + r.rejected + r.not_executed).toBe(20);
+    expect(r.ring_ok).toBe(true);
+    expect(burstOk(r)).toBe(true);
   }, 400_000);
 });
