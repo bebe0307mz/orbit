@@ -90,7 +90,7 @@ See: `New account <orbit-owner-<s>.testnet> created successfully.` five times. T
 Then set the environment (keep it outside the repo):
 
 ```bash
-export NEAR_NETWORK=testnet NEAR_RPC_URL=https://rpc.testnet.near.org,https://rpc.testnet.fastnear.com
+export NEAR_NETWORK=testnet NEAR_RPC_URL=https://rpc.testnet.fastnear.com,https://rpc.testnet.near.org
 export VAULT_ACCOUNT_ID=orbit-vault-<s>.testnet OWNER_ACCOUNT_ID=orbit-owner-<s>.testnet TOKEN_ACCOUNT_ID=orbit-token-<s>.testnet
 export MERCHANT_ACCOUNT_ID=orbit-merchant-<s>.testnet UNLISTED_ACCOUNT_ID=orbit-unlisted-<s>.testnet
 export ORBIT_KEY_DIR=$HOME/.near-credentials/orbit-testnet/$VAULT_ACCOUNT_ID

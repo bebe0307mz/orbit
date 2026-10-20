@@ -14,7 +14,7 @@ const m = createMerchant({
   merchant: env('MERCHANT_ACCOUNT_ID'),
   asset: env('TOKEN_ACCOUNT_ID'),
   network: network === 'mainnet' ? 'near:mainnet' : 'near:testnet',
-  rpc: new NearRpc(env('NEAR_RPC_URL', network === 'mainnet' ? 'https://rpc.mainnet.near.org' : 'https://rpc.testnet.near.org').split(',')),
+  rpc: new NearRpc(env('NEAR_RPC_URL', network === 'mainnet' ? 'https://rpc.mainnet.fastnear.com,https://rpc.mainnet.near.org' : 'https://rpc.testnet.fastnear.com,https://rpc.testnet.near.org').split(',')),
   price: env('MERCHANT_PRICE', '10000'),
   invoiceTtlMs: Number(env('MERCHANT_INVOICE_TTL_MS', '120000')),
   dbPath: env('MERCHANT_DB', 'merchant.sqlite'),

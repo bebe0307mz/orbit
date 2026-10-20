@@ -75,7 +75,12 @@ export class NearRpc {
         if (res.status === 429 || res.status >= 500) continue;
         throw last;
       }
-      const body = (await res.json()) as { result?: T; error?: { name?: string; message?: string; cause?: { name?: string; info?: unknown }; data?: unknown } };
+      const body = (await res.json()) as { result?: T; error?: { code?: number; name?: string; message?: string; cause?: { name?: string; info?: unknown }; data?: unknown } };
+      if (body.error?.code === -429) {
+        // Rate limited (the deprecated rpc.*.near.org endpoints answer -429): nothing was accepted, try the next URL.
+        last = new RpcError('HTTP_429', `NEAR RPC ${method}: rate limited (-429)`);
+        continue;
+      }
       if (body.error) {
         const code = errorCode(body.error);
         throw new RpcError(code, `NEAR RPC ${method}: ${code}`, body.error.data ?? body.error.cause);
