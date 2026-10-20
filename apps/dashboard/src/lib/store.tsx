@@ -210,6 +210,11 @@ export function StoreProvider({ source, pollMs, children }: { source: VaultSourc
     });
   }, [source]);
 
+  // Mock only: lets the UI check compare every [data-check] figure with the formula over the rendered snapshot.
+  useEffect(() => {
+    if (source.kind === 'mock') (window as unknown as { __ORBIT_DEBUG__: unknown }).__ORBIT_DEBUG__ = { state, outcomes };
+  }, [source, state, outcomes]);
+
   const value = useMemo<Store>(
     () => ({ source, state, loadError, retrying, retry, outcomes, oldestSeq, session, sessionNote, signIn, signOut, ops, requestPause, clearOp }),
     [source, state, loadError, retrying, retry, outcomes, oldestSeq, session, sessionNote, signIn, signOut, ops, requestPause, clearOp],

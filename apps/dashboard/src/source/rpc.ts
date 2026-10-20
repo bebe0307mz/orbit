@@ -67,7 +67,7 @@ export function mapState(v: VaultState, opts: { network: Network; vaultAccountId
   return {
     network: opts.network,
     vault_account: opts.vaultAccountId,
-    guardian_pk: null,
+    guardian_pk: v.guardian_pk ?? null,
     snapshot: { block_height: v.block_height, timestamp_ms: v.timestamp_ms, day: v.day, fetched_at_ms: opts.now, age_ms: age, stale: age > STALE_MS, rpc_ok: true, last_error: null },
     sync: null,
     vault: {

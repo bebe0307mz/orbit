@@ -85,6 +85,10 @@ export interface VaultState {
   timestamp_ms: number;
   day: number;
   version: string;
+  /** Not in 3-contract.md; returned by contracts/vault (Builder A) */
+  owner?: string;
+  /** Not in 3-contract.md; returned by contracts/vault (Builder A) */
+  guardian_pk?: string;
   near: NearBalance;
   token: string;
   float_cap: BaseUnits;

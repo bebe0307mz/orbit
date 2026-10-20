@@ -277,7 +277,7 @@ td.c-of { display: none; }
 /* ---------- Activity table ---------- */
 .act .toolbar .select { width: auto; min-width: 168px; height: var(--ctl-h-sm); font-size: 13px; background-position: right 12px top 12px, right 8px top 12px; }
 .table-wrap.ac { container: actable / inline-size; }
-table.t th.c-time { width: 128px; }
+table.t th.c-time { width: 148px; }
 table.t th.c-agent { width: 148px; }
 table.t th.c-amt { width: 96px; }
 table.t th.c-st { width: 112px; }

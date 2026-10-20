@@ -2,6 +2,13 @@
   "name": "orbit",
   "private": true,
   "packageManager": "pnpm@9.15.9",
-  "engines": { "node": ">=22" },
-  "scripts": {}
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @orbit/dashboard dev",
+    "test": "pnpm -r --if-present test",
+    "check:ui": "node harness/ui/check-ui.mjs",
+    "check:contrast": "node harness/ui/contrast.mjs"
+  }
 }
