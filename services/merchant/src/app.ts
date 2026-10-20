@@ -45,12 +45,12 @@ interface PaymentView {
 }
 
 class Refusal extends Error {
-  constructor(
-    readonly code: string,
-    message: string,
-    readonly retryAfter?: number,
-  ) {
+  readonly code: string;
+  readonly retryAfter: number | undefined;
+  constructor(code: string, message: string, retryAfter?: number) {
     super(message);
+    this.code = code;
+    this.retryAfter = retryAfter;
   }
 }
 
