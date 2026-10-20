@@ -1118,6 +1118,23 @@ async fn t35b(w: &Worker<Sandbox>) -> Result<String> {
     Ok(format!("upgrade receipt failed E_STATE in migrate; code unchanged {code_after}; state identical; pay still works"))
 }
 
+/// Mainnet build guard: `new` refuses any token other than Circle USDC and a float cap above 20 USDC.
+async fn mainnet_guard(w: &Worker<Sandbox>) -> Result<String> {
+    let root = w.root_account()?;
+    let v = sub(&root, "mguard-vault", 10).await?;
+    let owner = sub(&root, "mguard-owner", 5).await?;
+    let g = SecretKey::from_random(KeyType::ED25519).public_key();
+    let init = |token: &str, cap: &str| json!({"owner": owner.id(), "token": token, "guardian_pk": g, "float_cap": cap, "org_daily_limit": "1000000"});
+    let r = v.batch(v.id()).deploy(&wasm_file("orbit_vault", "orbit_vault_mainnet")).call(Function::new("new").args_json(init("mock-ft.test.near", "20000000")).gas(Gas::from_tgas(300))).transact().await?;
+    ensure!(r.is_failure() && format!("{:?}", r.clone().into_result().unwrap_err()).contains("E_ARGS"), "mainnet build accepted a non-USDC token");
+    let usdc = "17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1";
+    let r = v.batch(v.id()).deploy(&wasm_file("orbit_vault", "orbit_vault_mainnet")).call(Function::new("new").args_json(init(usdc, "20000001")).gas(Gas::from_tgas(300))).transact().await?;
+    ensure!(r.is_failure(), "mainnet build accepted float_cap above 20 USDC");
+    let r = v.batch(v.id()).deploy(&wasm_file("orbit_vault", "orbit_vault_mainnet")).call(Function::new("new").args_json(init(usdc, "20000000")).gas(Gas::from_tgas(300))).transact().await?;
+    ensure!(r.is_success(), "mainnet build refused USDC with a 20 USDC cap: {:?}", r.into_result().err());
+    Ok("mainnet wasm: new refuses a non-USDC token and float_cap 20000001; accepts Circle USDC with 20000000".into())
+}
+
 /// T-50, T-51 via state patching: free NEAR below 0.5 makes pay fail closed while pause works;
 /// a pending payment still settles with zero free NEAR (storage-neutral callback).
 async fn t50_t51(w: &Worker<Sandbox>) -> Result<String> {
@@ -1255,6 +1272,7 @@ async fn harness() -> Result<()> {
         ("T-18/T-34", "I3 I5 in-flight", |w| Box::pin(t18_t34(w))),
         ("T-35b", "I6 upgrade revert", |w| Box::pin(t35b(w))),
         ("T-50/T-51", "liveness storage", |w| Box::pin(t50_t51(w))),
+        ("MAINNET-GUARD", "I12 build pins", |w| Box::pin(mainnet_guard(w))),
         ("T-12", "I1 I2 midnight", |w| Box::pin(t12_sandbox(w))),
     ];
     let mut rows = vec![];
@@ -1292,7 +1310,11 @@ async fn harness() -> Result<()> {
         .map(|r| json!({"id": r.id, "invariants": r.inv, "status": r.status, "ms": r.ms, "evidence": r.detail}))
         .collect();
     let _ = std::fs::write(
-        format!("{out}/sandbox.json"),
+        // Full runs write sandbox.json (read by the harness report); filtered runs write sandbox-<filter>.json.
+        match &only {
+            None => format!("{out}/sandbox.json"),
+            Some(o) => format!("{out}/sandbox-{}.json", o.join("_").to_lowercase().replace(['/', ' '], "-")),
+        },
         serde_json::to_string_pretty(&json!({"layer": "S", "pass": pass, "fail": fail, "skip": skip, "tests": json_rows}))?,
     );
     ensure!(fail == 0, "{fail} sandbox scenario(s) failed");

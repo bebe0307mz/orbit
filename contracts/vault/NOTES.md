@@ -40,9 +40,9 @@ Vault `orbit-vault-fkuc.testnet`, owner `orbit-owner-fkuc.testnet`, token `orbit
 ## Mainnet readiness checklist (nothing deployed)
 
 Must be true first:
-- [ ] `scripts/test-contracts.sh` green (22 unit, sandbox PASS with 0 FAIL), plus `ORBIT_MIDNIGHT=1` sandbox T-12 green once.
+- [ ] `scripts/test-contracts.sh` green (22 unit, sandbox PASS 22 FAIL 0), plus `ORBIT_MIDNIGHT=1` sandbox T-12 green once (passed 2026-10-20: P1 reserved 2.5 s before UTC midnight, settled 0.3 s after, committed to d+1).
 - [ ] Testnet: `scripts/testnet-proof.sh` and `pnpm demo:attack --agent <name>` / `--burst` green on a vault deployed from the same commit (the fkuc testnet vaults run an earlier build, code_hash `4LRJE2Wt...`).
-- [ ] Mainnet build: `cd contracts/vault && cargo near build non-reproducible-wasm --no-abi --features mainnet`, then copy `target/near/orbit_vault/orbit_vault.wasm` to `orbit_vault_mainnet.wasm`. That build pins Circle USDC `17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1` and refuses `float_cap > 20 USDC` in `new`. Record its sha256 and base58 code hash in the README before deploying.
+- [ ] Mainnet build: `scripts/build-contracts.sh` writes `target/near/orbit_vault/orbit_vault_mainnet.wasm` (`--features mainnet`; sandbox MAINNET-GUARD checks it). That build pins Circle USDC `17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1` and refuses `float_cap > 20 USDC` in `new`. Record its sha256 and base58 code hash in the README before deploying.
 - [ ] Circle USDC behavior (E4, S-2 mainnet): one tiny payment to a merchant that is not registered on USDC must settle `failed:transfer_failed` with a full refund. Do it once, right after deploy, with an extra demo agent and merchant you then remove.
 - [ ] Guardian key generated on the API VM (`pnpm api keygen`); only its public key comes to the founder machine.
 - [ ] Demo copy updated: a re-broadcast returns the original outcome, it is not "refused by RPC".

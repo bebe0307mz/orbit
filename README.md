@@ -62,13 +62,13 @@ pnpm install
 scripts/build-contracts.sh
 ```
 
-See: `Binary: .../target/near/mock_ft/mock_ft.wasm` and `Binary: .../target/near/orbit_vault/orbit_vault.wasm`.
+See: `Binary: .../target/near/mock_ft/mock_ft.wasm` and `Binary: .../target/near/orbit_vault/orbit_vault.wasm`. The script also keeps two variants next to it: `orbit_vault_mainnet.wasm` (pins Circle USDC, float cap at most 20 USDC) and `orbit_vault_migrate_panic.wasm` (test only).
 
 ### 2. Run the tests
 
 ```bash
 cargo test -p orbit-vault --lib            # see: test result: ok. 22 passed
-cargo test -p orbit-sandbox-tests --test sandbox -- --nocapture   # see: VERDICT: PASS 21, FAIL 0, SKIP 1
+cargo test -p orbit-sandbox-tests --test sandbox -- --nocapture   # see: VERDICT: PASS 22, FAIL 0, SKIP 1
 pnpm test                                  # TypeScript suites (SDK, merchant, CLI, API, dashboard)
 ```
 
