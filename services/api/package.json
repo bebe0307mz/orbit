@@ -1,0 +1,26 @@
+{
+  "name": "@orbit/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Orbit API: vault syncer, SQLite history, read API, guardian pause signer, operator session",
+  "scripts": {
+    "start": "node --experimental-strip-types --no-warnings=ExperimentalWarning src/main.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "keygen": "node --experimental-strip-types --no-warnings=ExperimentalWarning src/cli.ts keygen",
+    "hash-password": "node --experimental-strip-types --no-warnings=ExperimentalWarning src/cli.ts hash-password",
+    "session-secret": "node --experimental-strip-types --no-warnings=ExperimentalWarning src/cli.ts session-secret"
+  },
+  "dependencies": {
+    "@orbit/vault-types": "workspace:*",
+    "@near-js/crypto": "2.5.1",
+    "@near-js/transactions": "2.5.1",
+    "@near-js/utils": "2.5.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.8"
+  }
+}
