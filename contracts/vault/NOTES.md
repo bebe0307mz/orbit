@@ -26,6 +26,11 @@ Builds: `scripts/build-contracts.sh` (cargo-near 0.22, rust 1.86, near-sdk 5.27)
 
 ## View shape changes (for Builder B)
 
+- Final `state()` shape: `{block_height, timestamp_ms, day, version, owner, guardian_pk, near: {balance (U128 string, yocto), storage_usage (number)}, token, float_cap, available, reserved, deposited_total, withdrawn_total, paid_total, org: {daily_limit, spent_today, reserved, paused}, counts: {paid, failed, rejected, next_seq}, agents: [{id, name, pk, status, per_payment_limit, daily_limit, spent_today, reserved, remaining_today, paid_count, rejected_count, failed_count}], merchants: [{account, name}], pending: [{payment_id, agent_id, merchant, amount, reserved_at_ms}], pending_count}`. Amounts are U128 decimal strings; counts, ids, heights and ms are numbers.
 - `state()` adds two top-level fields: `owner` (account id) and `guardian_pk` (`ed25519:...`). Everything else matches 3-contract.md.
 - Events: NEP-297 `EVENT_JSON:{"standard":"orbit-vault","version":"1.0.0","event":...,"data":[{...}]}`; `data` is a one-element array. `payment_paid|failed|rejected` data: `payment_id, agent_id, merchant, amount, seq, reason` (`reason` null for paid). `deposited` data: `sender_id, accepted, refunded`.
 - `payment(id)` with a malformed id panics `E_ARGS` (unknown well-formed id returns null).
+
+## Testnet deployment (2026-10-20)
+
+Vault `orbit-vault-fkuc.testnet`, owner `orbit-owner-fkuc.testnet`, token `orbit-token-fkuc.testnet` (otusd), merchant `orbit-merchant-fkuc.testnet`, unlisted `orbit-unlisted-fkuc.testnet`. Deploy key deleted. Guardian key file (NEAR credentials JSON, mode 600, outside the repo): `~/.near-credentials/orbit-testnet/orbit-vault-fkuc.testnet/guardian.json`, added at init with methods exactly `pause_agent,pause_all`.
