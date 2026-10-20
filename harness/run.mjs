@@ -188,6 +188,42 @@ function proofs() {
   });
 }
 
+/** Builder A's scripts/testnet-proof.sh runs: harness/out/testnet-<utc>/ with summary.json (checks) and txs.tsv. Newest first. */
+function proofRuns() {
+  const dirs = existsSync(OUT) ? readdirSync(OUT).filter((d) => /^testnet-\d{8}T\d{6}Z$/.test(d) && statSync(join(OUT, d)).isDirectory()).sort().reverse() : [];
+  return dirs.map((d) => {
+    const at = d.replace(/^testnet-(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/, '$1-$2-$3T$4:$5:$6Z');
+    const run = { dir: d, at, network: 'testnet', vault: null, block: null, checks: [], txs: [], counts: null, complete: false };
+    const sumFile = join(OUT, d, 'summary.json');
+    if (existsSync(sumFile)) {
+      try {
+        const j = JSON.parse(readFileSync(sumFile, 'utf8'));
+        run.complete = true;
+        run.vault = j.vault ?? null;
+        run.block = j.block_height ?? null;
+        run.counts = j.counts ?? null;
+        run.checks = (j.checks ?? []).map((c) => ({ check: String(c.check ?? ''), ok: c.ok === true, detail: c.detail == null ? '' : String(c.detail) }));
+      } catch {
+        run.checks = [{ check: 'summary.json', ok: false, detail: 'not valid JSON' }];
+      }
+    }
+    const txFile = join(OUT, d, 'txs.tsv');
+    if (existsSync(txFile)) {
+      for (const line of readFileSync(txFile, 'utf8').split('\n').filter(Boolean)) {
+        const [step, hash, result = ''] = line.split('\t');
+        let outcome = result.trim();
+        try {
+          const r = JSON.parse(result);
+          if (r && typeof r === 'object') outcome = [r.status, r.reason, r.seq != null ? `seq ${r.seq}` : null].filter(Boolean).join(' · ');
+          else outcome = `returned ${JSON.stringify(r)}`;
+        } catch { /* plain text */ }
+        if (/^[1-9A-HJ-NP-Za-km-z]{43,44}$/.test(hash ?? '')) run.txs.push({ step, hash, outcome });
+      }
+    }
+    return run;
+  });
+}
+
 const SHOTS = [
   ['agents-dark-1440', 'Agents, dark, 1440'], ['agents-light-1440', 'Agents, light, 1440'], ['agents-panel-dark-1440', 'Detail panel, docked'],
   ['agents-panel-light-1024', 'Detail panel, overlay, light'], ['activity-dark-1440', 'Activity, dark'], ['activity-light-390', 'Activity, light, 390'],
@@ -235,7 +271,7 @@ const meta = {
   runId, sha, branch: sh('git rev-parse --abbrev-ref HEAD'), dirty: !!sh('git status --porcelain -- packages apps services harness contracts'),
   started: started.toISOString(), finished: new Date().toISOString(), node: process.version, onlySteps: only,
 };
-const html = renderReport({ meta, suites, shots, proofs: proofs(), tokensCss: readFileSync(join(root, 'apps/dashboard/src/styles/tokens.css'), 'utf8') });
+const html = renderReport({ meta, suites, shots, proofs: proofs(), proofRuns: proofRuns(), tokensCss: readFileSync(join(root, 'apps/dashboard/src/styles/tokens.css'), 'utf8') });
 writeFileSync(join(dir, `${runId}.html`), html);
 writeFileSync(join(dir, 'latest.html'), html);
 writeFileSync(join(dir, `${runId}.json`), JSON.stringify({ meta, suites: suites.map(({ log, ...s }) => ({ ...s, tests: s.tests.map(({ msgs, ...t }) => t) })) }, null, 2));

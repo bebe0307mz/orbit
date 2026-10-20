@@ -41,7 +41,7 @@ function serviceCoverage(suites) {
 
 const COV = { covered: ['ok', 'Covered'], fail: ['danger', 'Failing'], notrun: ['warn', 'Not run this time'], missing: ['danger', 'Missing'] };
 
-export function renderReport({ meta, suites, shots, proofs, tokensCss }) {
+export function renderReport({ meta, suites, shots, proofs, proofRuns = [], tokensCss }) {
   const failing = suites.filter((s) => s.status === 'fail' || s.status === 'error');
   const overall = failing.length ? 'fail' : 'pass';
   const total = suites.reduce((a, s) => ({ p: a.p + s.passed, f: a.f + s.failed, k: a.k + s.skipped }), { p: 0, f: 0, k: 0 });
@@ -50,6 +50,7 @@ export function renderReport({ meta, suites, shots, proofs, tokensCss }) {
   const svc = serviceCoverage(suites);
   const covered = cov.filter((c) => c.state === 'covered').length;
   const ms = new Date(meta.finished) - new Date(meta.started);
+  const latestRun = proofRuns.find((r) => r.complete) ?? proofRuns[0];
 
   const chips = suites.map((s) => `<a class="chip" href="#s-${esc(s.id)}"><span class="dot ${DOT[s.status]}"></span><span class="cn">${esc(s.id)}</span><span class="num">${s.passed}</span><span class="muted">passed</span>${s.failed ? `<span class="num danger">${s.failed}</span><span class="danger">failed</span>` : ''}${s.status === 'skip' ? '<span class="warn">skipped</span>' : ''}${s.status === 'error' ? '<span class="danger">error</span>' : ''}</a>`).join('');
 
@@ -71,14 +72,24 @@ export function renderReport({ meta, suites, shots, proofs, tokensCss }) {
     ? `<div class="shots">${shots.map((x) => `<figure><a href="${esc(x.src)}" target="_blank" rel="noopener"><img src="${esc(x.src)}" alt="${esc(x.caption)}" loading="lazy"></a><figcaption>${esc(x.caption)}</figcaption></figure>`).join('')}</div>`
     : '<p class="muted">No screenshots in this run (UI suites not run).</p>';
 
-  const proofHtml = proofs.length
+  const runHtml = latestRun ? (() => {
+    const ex = latestRun.network === 'mainnet' ? 'https://nearblocks.io' : 'https://testnet.nearblocks.io';
+    const okN = latestRun.checks.filter((c) => c.ok).length;
+    const checks = latestRun.checks.map((c) => `<tr><td class="c-st"><span class="st ${c.ok ? 'ok' : 'danger'}"><span class="dot ${c.ok ? 'ok' : 'danger'}"></span>${c.ok ? 'Passed' : 'Failed'}</span></td><td>${esc(c.check)}</td><td class="mono muted">${esc(c.detail)}</td></tr>`).join('');
+    const txs = latestRun.txs.map((t) => `<tr><td>${esc(t.step)}</td><td><a class="mono" href="${ex}/txns/${encodeURIComponent(t.hash)}" target="_blank" rel="noopener" title="${esc(t.hash)}">${esc(mid(t.hash))}</a></td><td class="mono">${esc(t.outcome)}</td></tr>`).join('');
+    return `<p class="lead">Latest on-chain proof from scripts/testnet-proof.sh: <span class="mono">${esc(latestRun.dir)}</span>${latestRun.vault ? ` · vault <a class="mono" href="${ex}/address/${encodeURIComponent(latestRun.vault)}" target="_blank" rel="noopener">${esc(latestRun.vault)}</a>` : ''}${latestRun.block ? ` · block ${Number(latestRun.block).toLocaleString('en-US')}` : ''}${latestRun.counts ? ` · ${latestRun.counts.paid} paid, ${latestRun.counts.rejected} rejected, ${latestRun.counts.failed} failed` : ''}. ${latestRun.complete ? `${okN} of ${latestRun.checks.length} checks passed.` : 'Run incomplete: no summary.json.'}${proofRuns.length > 1 ? ` ${proofRuns.length - 1} earlier run${proofRuns.length > 2 ? 's' : ''} in harness/out.` : ''}</p>
+${latestRun.checks.length ? `<div class="tw"><table class="t"><thead><tr><th class="c-st">Status</th><th>Check</th><th>Detail</th></tr></thead><tbody>${checks}</tbody></table></div>` : ''}
+${latestRun.txs.length ? `<h3 style="margin:var(--s5) 0 var(--s2)">Transactions</h3><div class="tw"><table class="t"><thead><tr><th>Step</th><th>Transaction</th><th>Outcome</th></tr></thead><tbody>${txs}</tbody></table></div>` : ''}`;
+  })() : '';
+
+  const proofHtml = runHtml + (proofs.length
     ? proofs.map((p) => {
         const ex = p.network === 'mainnet' ? 'https://nearblocks.io' : 'https://testnet.nearblocks.io';
         if (p.error) return `<p class="danger">${esc(p.file)}: ${esc(p.error)}</p>`;
         const rows = p.rows.map((r) => `<tr><td>${r.label ? esc(r.label) : '<span class="muted">unnamed</span>'}</td><td>${r.status ? `<span class="st ${/pass|ok|true|confirmed/i.test(r.status) ? 'ok' : /fail|false/i.test(r.status) ? 'danger' : 'muted'}">${esc(r.status)}</span>` : ''}</td><td>${r.txs.length ? r.txs.map((t) => `<a class="mono" href="${ex}/txns/${encodeURIComponent(t.hash)}" target="_blank" rel="noopener" title="${esc(t.key)}: ${esc(t.hash)}">${esc(mid(t.hash))}</a>`).join(' ') : '<span class="muted">no tx</span>'}</td><td class="muted">${esc(r.note ?? '')}</td></tr>`).join('');
         return `<h3 class="mono">${esc(p.file)} <span class="muted">· ${esc(p.network)}${p.vault ? ' · ' + esc(p.vault) : ''} · ${esc(utc(p.generatedAt))}</span></h3><div class="tw"><table class="t"><thead><tr><th>Step</th><th>Status</th><th>Transactions</th><th>Evidence</th></tr></thead><tbody>${rows}</tbody></table></div>`;
       }).join('')
-    : '<p class="muted">No testnet proof yet. Builder A writes harness/out/testnet-proof*.json after the testnet run; this section links each transaction on NearBlocks.</p>';
+    : runHtml ? '' : '<p class="muted">No testnet proof yet. scripts/testnet-proof.sh writes harness/out/testnet-&lt;utc&gt;/ (or a testnet-proof*.json); this section links each transaction on NearBlocks.</p>');
 
   return `<!doctype html>
 <html lang="en" data-theme="dark">
@@ -165,6 +176,7 @@ table.wide{min-width:960px}.run-id-m{display:none}
     <div class="fig"><div class="l">Tests passed</div><div class="v">${total.p}</div><div class="s">${total.f} failed · ${total.k} skipped</div></div>
     <div class="fig"><div class="l">UI checks</div><div class="v">${uiChecks}</div><div class="s">${uiChecks ? 'both themes, 4 widths, live modes' : 'UI suites not run'}</div></div>
     <div class="fig"><div class="l">Invariants with a passing contract test</div><div class="v">${covered} of 12</div><div class="s">${cov.filter((c) => c.state === 'missing').length} missing · ${cov.filter((c) => c.state === 'notrun').length} not run</div></div>
+    ${latestRun?.complete ? `<div class="fig"><div class="l">Testnet proof</div><div class="v ${latestRun.checks.every((c) => c.ok) ? '' : 'danger'}">${latestRun.checks.filter((c) => c.ok).length} of ${latestRun.checks.length}</div><div class="s">checks · ${latestRun.txs.length} transactions</div></div>` : ''}
   </div>
   <div class="chips">${chips}</div>
 
