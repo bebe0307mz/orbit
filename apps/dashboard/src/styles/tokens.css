@@ -1,0 +1,87 @@
+/* Orbit theme tokens. Ported from docs/ui/orbit/orbit-v2.css. Dark is the default; light is the same layout with
+   different values. Components use only these custom properties, never literal colors.
+   The contrast check (harness/ui/contrast.mjs) parses this file: keep one declaration per line inside the theme blocks. */
+
+:root {
+  --font: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 20px; --s6: 24px; --s8: 32px; --s10: 40px; --s14: 56px;
+  --r-1: 4px; --r-2: 6px; --r-3: 8px;
+  --gutter: 24px;
+  --max: 1280px;
+  --bar-h: 48px;
+  --row-h: 36px;
+  --head-h: 32px;
+  --ctl-h: 32px;
+  --ctl-h-sm: 28px;
+  --panel-w: 480px;
+}
+@media (max-width: 767px) { :root { --gutter: 16px; } }
+
+/* theme:dark */
+:root, :root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0D0D0E;
+  --bg-subtle: #141416;
+  --bg-hover: #1B1B1E;
+  --ink: #EDEDEF;
+  --ink-2: #C4C4CA;
+  --muted: #8F8F98;
+  --faint: #5F5F68;
+  --line: #242427;
+  --line-strong: #34343A;
+  --accent: #8098FF;
+  --accent-bg: #161C33;
+  --warn: #F0A33A;
+  --warn-dot: #F0A33A;
+  --warn-bg: #2A1F0C;
+  --danger: #F26B5E;
+  --danger-bg: #2C1513;
+  --ok: #4FD180;
+  --on-ink: #0D0D0E;
+  --on-danger: #160807;
+  --bar: #D4D4D8;
+  --track: #2A2A2E;
+  --scrim: rgb(0 0 0 / .5);
+  --shadow-overlay: 0 16px 48px rgb(0 0 0 / .6);
+}
+/* end theme:dark */
+
+/* theme:light */
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #FFFFFF;
+  --bg-subtle: #FAFAFA;
+  --bg-hover: #F4F4F5;
+  --ink: #0B0B0C;
+  --ink-2: #3F3F46;
+  --muted: #6E6E76;
+  --faint: #A1A1AA;
+  --line: #EAEAEC;
+  --line-strong: #D4D4D8;
+  --accent: #2747D6;
+  --accent-bg: #F1F4FE;
+  --warn: #A35A00;
+  --warn-dot: #D98A10;
+  --warn-bg: #FFF8EB;
+  --danger: #C42B1C;
+  --danger-bg: #FDF3F2;
+  --ok: #1D7A3E;
+  --on-ink: #FFFFFF;
+  --on-danger: #FFFFFF;
+  --bar: #0B0B0C;
+  --track: #E4E4E7;
+  --scrim: rgb(0 0 0 / .24);
+  --shadow-overlay: 0 16px 48px rgb(0 0 0 / .14);
+}
+/* end theme:light */
+
+/* Semantic aliases, so new code can name roles rather than prototype token names */
+:root {
+  --surface: var(--bg-subtle);
+  --text: var(--ink);
+  --text-2: var(--ink-2);
+  --border: var(--line);
+  --border-strong: var(--line-strong);
+}
