@@ -1,0 +1,21 @@
+{
+  "name": "@orbit/vault-types",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Types for the Orbit vault contract views and the dashboard API, plus formatting and accounting helpers",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./fixtures": "./fixtures/mvp.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.8"
+  }
+}
