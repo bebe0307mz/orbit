@@ -154,6 +154,9 @@ async function matrix() {
     await o.page.waitForSelector('[data-check="vault.balance"]');
     await o.page.waitForFunction(() => window.__ORBIT_DEBUG__ && window.__ORBIT_DEBUG__.outcomes.length > 0);
     ok((await o.page.getAttribute('html', 'data-theme')) === theme, `agents: theme attribute is ${theme}`);
+    ok(await o.page.locator('[data-testid="sample-badge"]').isVisible(), 'mock source: Sample data badge visible next to the network badge');
+    const rowTops = await o.page.evaluate(() => ['.topbar .wordmark', '.topbar .badges', '.topbar .right'].map((q) => Math.round(document.querySelector(q).getBoundingClientRect().top)));
+    ok(new Set(rowTops).size === 1, `header row 1 stays one line (tops ${rowTops.join(',')})`);
     await checkFigures(o.page, 'agents');
     await noHScroll(o.page, 'agents');
     await copyRules(o.page, 'agents');

@@ -3,6 +3,9 @@ import { config } from '../config';
 import { useNow, useStore } from '../lib/store';
 import { hrefFor, type Screen } from '../lib/route';
 import { ThemeToggle } from './ThemeToggle';
+import { SignInDialog } from './SignInDialog';
+import { useState } from 'react';
+import { createPortal } from 'react-dom';
 
 /** True when the snapshot is stale: the API's flag, or a block age above STALE_MS. */
 export function useStale(): { stale: boolean; ageMs: number } {
@@ -31,7 +34,9 @@ function Freshness({ short }: { short?: boolean }) {
 }
 
 function SessionSlot() {
-  const { session, sessionNote, signIn, signOut } = useStore();
+  const { source, session, sessionNote, signIn, signOut } = useStore();
+  const [asking, setAsking] = useState(false);
+  const start = () => (source.needsPassword ? setAsking(true) : signIn().catch(() => undefined));
   if (session.operator) {
     return (
       <span className="session" id="session">
@@ -45,9 +50,10 @@ function SessionSlot() {
   return (
     <span className="session" id="session" title={sessionNote && sessionNote !== 'Signed out' ? sessionNote : undefined}>
       {sessionNote === 'Signed out' ? 'Signed out · ' : ''}
-      <button className="btn link" type="button" onClick={signIn}>
+      <button className="btn link" type="button" id="signInLink" onClick={start}>
         Sign in to pause
       </button>
+      {asking ? createPortal(<SignInDialog onClose={() => setAsking(false)} />, document.body) : null}
     </span>
   );
 }
@@ -60,9 +66,16 @@ export function Shell({ screen }: { screen: Screen }) {
     <header className="topbar">
       <span className="wordmark">Orbit</span>
       <span className="org">{config.orgName}</span>
-      <span className={'tag net' + (network === 'testnet' ? ' testnet' : '')}>
-        {network === 'testnet' ? 'Testnet' : 'Mainnet'}
-        {testToken ? <span className="tt">· test token</span> : null}
+      <span className="badges">
+        <span className={'tag net' + (network === 'testnet' ? ' testnet' : '')}>
+          {network === 'testnet' ? 'Testnet' : 'Mainnet'}
+          {testToken ? <span className="tt">· test token</span> : null}
+        </span>
+        {source.kind === 'mock' ? (
+          <span className="tag sample" data-testid="sample-badge" title="Mock source: seeded sample data, chain steps simulated">
+            Sample<span className="sd"> data</span>
+          </span>
+        ) : null}
       </span>
       <nav className="tabs" aria-label="Main">
         <a className="tab" href={hrefFor('agents')} aria-current={screen === 'agents' ? 'page' : undefined} id="tabAgents">

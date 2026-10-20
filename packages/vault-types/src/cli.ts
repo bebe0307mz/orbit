@@ -1,8 +1,8 @@
 // Argument strings for `orbit-cli paste` (MD-10, 5-ui-spec.md UI-4). Built only from validated fields;
 // a string never contains `;`, `|`, a backtick, `$(` or a newline. The CLI parses it with its own grammar.
-import type { Network } from './api';
-import type { BaseUnits } from './contract';
-import { fmtUsdPlain } from './format';
+import type { Network } from './api.ts';
+import type { BaseUnits } from './contract.ts';
+import { fmtUsdPlain } from './format.ts';
 
 export const AGENT_NAME_RE = /^[a-z0-9-]{1,32}$/;
 export const ED25519_PK_RE = /^ed25519:[1-9A-HJ-NP-Za-km-z]{43,44}$/;

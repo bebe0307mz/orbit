@@ -1,14 +1,14 @@
-import { Fragment, useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import {
   dateShort, explorerBase, fmtInt, fmtUsd, hhmm, hhmmss, midTrunc, reasonLabel, timeCell,
-  type DashboardState, type OutcomeItem, type PendingView,
+  type DashboardState, type OutcomeItem,
 } from '@orbit/vault-types';
 import { Banners, useStale } from '../components/Shell';
 import { CopyButton, Dot, isTypingTarget } from '../components/common';
 import { useStore } from '../lib/store';
 import { hrefFor, replaceRoute, type Route } from '../lib/route';
+import { useActivityRows } from '../lib/history';
 
-const PAGE = 25;
 type Status = 'all' | 'paid' | 'rejected' | 'failed' | 'pending';
 const STATUSES: Status[] = ['all', 'paid', 'rejected', 'failed', 'pending'];
 
@@ -76,30 +76,21 @@ function Detail({ o, pending, s }: { o: { payment_id: string; merchant: string }
 }
 
 export function ActivityScreen({ route }: { route: Route }) {
-  const { state: s, outcomes, loadError, retry, retrying } = useStore();
+  const { state: s, loadError, retry, retrying } = useStore();
   const { stale } = useStale();
   const p = route.params;
   const status: Status = STATUSES.includes(p.get('status') as Status) ? (p.get('status') as Status) : 'all';
   const agent = p.get('agent') ?? '';
   const merchant = p.get('merchant') ?? '';
-  const [pages, setPages] = useState(1);
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [current, setCurrent] = useState<string | null>(null);
+  const rows = useActivityRows({ status, agent, merchant });
+  const shown = rows.shown;
 
   const setFilter = (patch: Partial<{ status: Status; agent: string; merchant: string }>) => {
     const next = { status, agent, merchant, ...patch };
-    setPages(1);
     replaceRoute('activity', { status: next.status === 'all' ? null : next.status, agent: next.agent || null, merchant: next.merchant || null });
   };
-
-  const rows = useMemo(() => {
-    if (!s) return { pend: [] as PendingView[], outs: [] as OutcomeItem[] };
-    const match = (x: { agent_id: number; merchant: string }) => (!agent || String(x.agent_id) === agent) && (!merchant || x.merchant === merchant);
-    const pend = status === 'all' || status === 'pending' ? s.pending.filter(match) : [];
-    const outs = status === 'pending' ? [] : outcomes.filter((o) => match(o) && (status === 'all' || o.kind === status)).slice().reverse();
-    return { pend, outs };
-  }, [s, outcomes, status, agent, merchant]);
-  const shown = rows.outs.slice(0, pages * PAGE);
 
   const toggle = (k: string) => {
     setOpen((o) => ({ ...o, [k]: !o[k] }));
@@ -205,7 +196,8 @@ export function ActivityScreen({ route }: { route: Route }) {
     ['pending', 'Pending', s.pending_count, 'count.pending'],
   ];
   const seen = new Set<string>(s.merchants.map((m) => m.account));
-  outcomes.forEach((o) => seen.add(o.merchant));
+  rows.seenMerchants.forEach((m) => seen.add(m));
+  if (merchant) seen.add(merchant);
   const listed = (m: string) => s.merchants.some((x) => x.account === m);
   const mopts = [...seen].sort((a, b) => Number(!listed(a)) - Number(!listed(b)));
   const agentName = (id: number) => s.agents.find((a) => a.id === id)?.name ?? `agent ${id}`;
@@ -248,7 +240,7 @@ export function ActivityScreen({ route }: { route: Route }) {
             </tr>
           </thead>
           <tbody>
-            {!rows.pend.length && !shown.length ? (
+            {!rows.pend.length && !shown.length && !rows.loading ? (
               <tr className="empty-row">
                 <td colSpan={6} className="empty-cell">
                   No outcomes match{' '}
@@ -298,13 +290,13 @@ export function ActivityScreen({ route }: { route: Route }) {
           </tbody>
         </table>
       </div>
-      {rows.outs.length > shown.length ? (
+      {rows.hasMore ? (
         <div className="foot-load">
-          <button className="btn secondary sm" type="button" id="older" onClick={() => setPages((n) => n + 1)}>Load older</button>
-          <span>{shown.length} of {rows.outs.length}</span>
+          <button className="btn secondary sm" type="button" id="older" disabled={rows.loading} onClick={rows.loadOlder}>{rows.loading ? 'Loading' : 'Load older'}</button>
+          <span>{rows.total != null ? `${shown.length} of ${rows.total}` : `${shown.length} shown`}</span>
         </div>
-      ) : shown.length ? (
-        <div className="foot-load">No older outcomes · oldest #{rows.outs[rows.outs.length - 1]!.seq}</div>
+      ) : shown.length && !rows.loading ? (
+        <div className="foot-load">No older outcomes · oldest #{shown[shown.length - 1]!.seq}</div>
       ) : null}
     </main>
   );

@@ -27,7 +27,8 @@ export interface Store {
   oldestSeq: number;
   session: Session;
   sessionNote: string | null;
-  signIn(): void;
+  /** Rejects with the source's error (wrong password, rate limited) so a sign-in form can show it. */
+  signIn(password?: string): Promise<void>;
   signOut(): void;
   ops: Record<string, OpEntry>;
   requestPause(target: PauseTarget): void;
@@ -87,10 +88,15 @@ export function StoreProvider({ source, pollMs, children }: { source: VaultSourc
     poll();
   }, [poll]);
 
-  // Outcome history: read new seqs whenever the snapshot's next_seq moves.
+  useEffect(() => {
+    source.refreshSession?.().then((s) => alive.current && setSession(s));
+  }, [source]);
+
+  // Outcome history (ring sources): read new seqs whenever the snapshot's next_seq moves.
+  // Cursor sources page history on the server; screens ask for pages themselves.
   const nextSeq = state?.counts.next_seq ?? 0;
   useEffect(() => {
-    if (!state || loadingOutcomes.current || nextSeq <= loadedNext.current) return;
+    if (source.history !== 'ring' || !state || loadingOutcomes.current || nextSeq <= loadedNext.current) return;
     loadingOutcomes.current = true;
     (async () => {
       let from = loadedNext.current;
@@ -193,15 +199,19 @@ export function StoreProvider({ source, pollMs, children }: { source: VaultSourc
     });
   }, []);
 
-  const signIn = useCallback(() => {
-    source.signIn().then(
-      (s) => {
+  const signIn = useCallback(
+    async (password?: string) => {
+      try {
+        const s = await source.signIn(password);
         setSession(s);
         setSessionNote(null);
-      },
-      (e) => setSessionNote(e instanceof Error ? e.message : String(e)),
-    );
-  }, [source]);
+      } catch (e) {
+        if (!source.needsPassword) setSessionNote(e instanceof Error ? e.message : String(e));
+        throw e;
+      }
+    },
+    [source],
+  );
 
   const signOut = useCallback(() => {
     source.signOut().then((s) => {

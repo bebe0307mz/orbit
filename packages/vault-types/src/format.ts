@@ -1,5 +1,5 @@
 // Display formatting (docs 5-ui-spec.md 9). Integer math with BigInt only, never floats.
-import { DAY_MS, type BaseUnits, type Reason } from './contract';
+import { DAY_MS, type BaseUnits, type Reason } from './contract.ts';
 
 const UNIT = 1_000_000n;
 

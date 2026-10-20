@@ -28,6 +28,7 @@ const clone = <T,>(x: T): T => JSON.parse(JSON.stringify(x));
 
 export class MockSource implements VaultSource {
   readonly kind = 'mock' as const;
+  readonly history = 'ring' as const;
   readonly network = MVP_STATE.network;
   private state: DashboardState | null;
   private outcomes: OutcomeItem[];

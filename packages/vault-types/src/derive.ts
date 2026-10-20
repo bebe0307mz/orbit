@@ -1,8 +1,8 @@
 // Every number on screen, as a formula over one snapshot (docs 2-lld.md 8, 3-contract.md 3.3 Views).
 // Pure functions over base-unit strings; the UI formats the results.
-import type { AgentView, BaseUnits, OrgView, VaultState } from './contract';
-import type { DashboardState, OutcomeItem } from './api';
-import { dayOf, toBig } from './format';
+import type { AgentView, BaseUnits, OrgView, VaultState } from './contract.ts';
+import type { DashboardState, OutcomeItem } from './api.ts';
+import { dayOf, toBig } from './format.ts';
 
 const max0 = (x: bigint) => (x < 0n ? 0n : x);
 const bmin = (...xs: bigint[]) => xs.reduce((m, x) => (x < m ? x : m));

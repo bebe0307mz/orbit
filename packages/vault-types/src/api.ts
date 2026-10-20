@@ -1,5 +1,5 @@
 // services/api shapes the dashboard reads (docs 4-data-api.md 4.6). Names follow the API, which wins over the UI spec.
-import type { AgentView, BaseUnits, CountsView, MerchantView, OutcomeKind, PendingView, Reason } from './contract';
+import type { AgentView, BaseUnits, CountsView, MerchantView, OutcomeKind, PendingView, Reason } from './contract.ts';
 
 export type Network = 'mainnet' | 'testnet';
 
@@ -107,3 +107,26 @@ export interface ApiErrorBody {
 }
 
 export const STALE_MS = 15_000;
+
+/** GET /v1/activity item: a settled outcome, or a pending payment (seq null) listed first on page one. */
+export interface ActivityItem {
+  seq: number | null;
+  status: OutcomeKind | 'pending';
+  agent_id: number;
+  agent_name?: string | null;
+  payment_id: string;
+  merchant: string;
+  merchant_name: string | null;
+  amount: BaseUnits;
+  reason: Reason | string | null;
+  block_height: number | null;
+  /** settlement time, or reserved_at_ms for pending */
+  timestamp_ms: number;
+  tx_hash: string | null;
+}
+
+export interface ActivityPage {
+  items: ActivityItem[];
+  next_before_seq: number | null;
+  gap_in_range?: SyncGap;
+}

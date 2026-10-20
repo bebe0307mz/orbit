@@ -1,6 +1,6 @@
 // Seed dataset equal to the approved prototype (docs/ui/orbit/data-mvp.js): mainnet, float cap $20.00,
 // org limit $5.00, 6 agents, 1 merchant, 55 outcomes, 2 pending. Fixed, then checked by checkSnapshot().
-import type { DashboardState, OutcomeItem } from "../src/api";
+import type { DashboardState, OutcomeItem } from "../src/api.ts";
 
 export const MVP_STATE: DashboardState = {
   "network": "mainnet",

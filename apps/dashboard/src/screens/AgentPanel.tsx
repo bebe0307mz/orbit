@@ -1,11 +1,11 @@
 import { useEffect, useRef } from 'react';
 import {
   agentBinding, cmdResumeAgent, cmdRevokeAgent, cmdSetAgentLimits, fmtUsd, hhmm, keyShort, orgRemaining, reasonLabel, toBig,
-  type OutcomeItem, type PendingView,
 } from '@orbit/vault-types';
 import { Cmd, CopyButton, Dot, Meter, useFocusTrap } from '../components/common';
 import { useStore } from '../lib/store';
 import { hrefFor } from '../lib/route';
+import { useAgentRecent } from '../lib/history';
 
 function TxRow({ merchant, name, st, amount, dead }: { merchant: string; name: string | null; st: React.ReactNode; amount: string; dead?: boolean }) {
   return (
@@ -19,7 +19,8 @@ function TxRow({ merchant, name, st, amount, dead }: { merchant: string; name: s
 
 /** Agent detail (5-ui-spec 4): docked from 1280 px, overlay 768 to 1279, full-screen dialog below 768. */
 export function AgentPanel({ id, onClose, onPause }: { id: number; onClose: () => void; onPause: (id: number) => void }) {
-  const { state: s, outcomes, session, ops } = useStore();
+  const { state: s, session, ops } = useStore();
+  const { pend, outs: mine } = useAgentRecent(id);
   const ref = useRef<HTMLElement>(null);
   const small = typeof window !== 'undefined' && window.innerWidth < 768;
   useFocusTrap(ref, small);
@@ -48,8 +49,6 @@ export function AgentPanel({ id, onClose, onPause }: { id: number; onClose: () =
   const b = agentBinding(a, s.org, s.vault.available);
   const orgLeft = orgRemaining(s.org);
   const sub = `Agent ${a.id} · ` + (a.status === 'revoked' ? 'Revoked · key deleted' : a.status === 'paused' ? 'Paused' : 'Active');
-  const pend: PendingView[] = s.pending.filter((p) => p.agent_id === a.id);
-  const mine: OutcomeItem[] = outcomes.filter((o) => o.agent_id === a.id).slice().reverse().slice(0, Math.max(0, 10 - pend.length));
 
   return (
     <aside className="panel" {...role} aria-label={`${a.name} detail`} ref={ref} id="panel">

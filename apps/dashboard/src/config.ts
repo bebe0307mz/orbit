@@ -3,7 +3,9 @@ import type { Network } from '@orbit/vault-types';
 const env = import.meta.env;
 
 export interface DashboardConfig {
-  source: 'mock' | 'rpc';
+  source: 'mock' | 'rpc' | 'api';
+  /** services/api origin; empty means same origin (the API serves the dashboard) */
+  apiUrl: string;
   network: Network;
   rpcUrl: string;
   vaultAccountId: string;
@@ -12,7 +14,8 @@ export interface DashboardConfig {
 }
 
 export const config: DashboardConfig = {
-  source: env.VITE_SOURCE === 'rpc' ? 'rpc' : 'mock',
+  source: env.VITE_SOURCE === 'rpc' ? 'rpc' : env.VITE_SOURCE === 'api' ? 'api' : 'mock',
+  apiUrl: env.VITE_API_URL || '',
   network: env.VITE_NETWORK === 'mainnet' ? 'mainnet' : 'testnet',
   rpcUrl: env.VITE_NEAR_RPC_URL || 'https://rpc.testnet.near.org',
   vaultAccountId: env.VITE_VAULT_ACCOUNT_ID || '',

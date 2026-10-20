@@ -86,6 +86,7 @@ export function mapState(v: VaultState, opts: { network: Network; vaultAccountId
 
 export class RpcSource implements VaultSource {
   readonly kind = 'rpc' as const;
+  readonly history = 'ring' as const;
   readonly network: Network;
   private fetchImpl: typeof fetch;
   private last: DashboardState | null = null;
