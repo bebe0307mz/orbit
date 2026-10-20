@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   agentBinding, agentDisplayStatus, agentRemaining, checkSnapshot, fmtUsd, orgRemaining, orgRemainingRaw, orgRemainingShown,
-  sumAmounts, vaultBalance, vaultBindsOrg, withdrawalsInFlight, freeYocto, type DashboardState,
+  sumAmounts, vaultBalance, vaultBindsOrg, withdrawalsInFlight, freeYocto, tokenBacking, type DashboardState,
 } from '../src';
 import { MVP_OUTCOMES, MVP_STATE } from '../fixtures/mvp';
 
@@ -102,4 +102,25 @@ describe('checkSnapshot catches broken snapshots', () => {
     expect(checkSnapshot(clone(), out).some((x) => x.startsWith('seq gap at #31'))).toBe(true);
   });
   it('sumAmounts', () => expect(sumAmounts(MVP_STATE.pending)).toBe(70000n));
+});
+
+describe('tokenBacking (C2, in-flight safe)', () => {
+  const quiet = { available: '4450000', reserved: '0', pending_count: 0, org: { reserved: '0' } };
+  const inflight = { available: '4400000', reserved: '50000', pending_count: 1, org: { reserved: '50000' } };
+  it('strict form when nothing is pending', () => {
+    expect(tokenBacking('4450000', quiet)).toEqual({ ok: true, required: 4450000n, strict: true });
+    expect(tokenBacking('4449999', quiet).ok).toBe(false);
+  });
+  it('while a payment is in flight the transferred tokens are not required', () => {
+    // ft_transfer already moved 50000 to the merchant; reserved still counts it until the callback
+    const r = tokenBacking('4400000', inflight);
+    expect(r).toEqual({ ok: true, required: 4400000n, strict: false });
+    // the strict form would wrongly fail here
+    expect(4400000n >= BigInt(inflight.available) + BigInt(inflight.reserved)).toBe(false);
+  });
+  it('withdrawals in flight (reserved above org.reserved) are still required', () => {
+    const s = { available: '1000000', reserved: '300000', pending_count: 1, org: { reserved: '100000' } };
+    expect(tokenBacking('1200000', s)).toMatchObject({ ok: true, required: 1200000n });
+    expect(tokenBacking('1199999', s).ok).toBe(false);
+  });
 });

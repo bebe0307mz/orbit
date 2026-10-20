@@ -30,7 +30,7 @@ afterEach(async () => {
   while (running.length) await running.pop()!.stop();
 });
 
-async function setup(o: { perm?: unknown; keyMode?: number; noKey?: boolean; chain?: FakeChain; env?: Record<string, string>; dbPath?: string } = {}): Promise<Ctx> {
+async function setup(o: { perm?: unknown; keyMode?: number; noKey?: boolean; chain?: FakeChain; env?: Record<string, string>; dbPath?: string; fetchImpl?: typeof fetch } = {}): Promise<Ctx> {
   const chain = o.chain ?? new FakeChain();
   const kp = KeyPair.fromRandom('ed25519');
   const dir = mkdtempSync(join(tmpdir(), 'orbit-api-'));
@@ -46,7 +46,7 @@ async function setup(o: { perm?: unknown; keyMode?: number; noKey?: boolean; cha
   });
   config.port = 0;
   const log = memoryLogger();
-  const api = await startApi(config, { log, fetchImpl: chain.fetch, now: chain.now });
+  const api = await startApi(config, { log, fetchImpl: o.fetchImpl ?? chain.fetch, now: chain.now });
   running.push(api);
   return { chain, api, log, dir, kp };
 }
@@ -216,6 +216,65 @@ describe('syncer', () => {
     expect((await req(c, '/v1/state')).json.sync.last_seq).toBe(57);
     await running.pop()!.stop();
     await expect(setup({ chain, dbPath, env: { VAULT_ACCOUNT: 'other.near' } })).rejects.toThrow(/database belongs to/);
+  });
+});
+
+describe('token backing (C2, in-flight safe)', () => {
+  it('in flight: ft_balance_of covers available + reserved - org.reserved; the strict form is not applied', async () => {
+    const c = await setup(); // fixture: 2 payments pending, org.reserved 70000, their tokens already transferred
+    const h = (await req(c, '/v1/health')).json;
+    expect(h.token_backing).toMatchObject({ ok: true, strict: false, balance: '14730000', required: '14730000' });
+    expect(h.ok).toBe(true);
+  });
+  it('nothing pending: the strict form available + reserved applies', async () => {
+    const chain = new FakeChain();
+    chain.state.pending = [];
+    chain.state.pending_count = 0;
+    chain.state.reserved = '0';
+    chain.state.org.reserved = '0';
+    chain.state.agents.forEach((a) => (a.reserved = '0'));
+    chain.state.available = '14800000';
+    const c = await setup({ chain });
+    expect((await req(c, '/v1/health')).json.token_backing).toMatchObject({ ok: true, strict: true, required: '14800000' });
+  });
+  it('a short balance fails health (503) and logs CRITICAL once', async () => {
+    const chain = new FakeChain();
+    chain.ftBalance = '14729999';
+    const c = await setup({ chain });
+    const h = await req(c, '/v1/health');
+    expect(h.status).toBe(503);
+    expect(h.json.token_backing).toMatchObject({ ok: false, required: '14730000' });
+    expect(c.log.lines.filter((l) => l.event === 'token_backing_short' && l.level === 'critical')).toHaveLength(1);
+  });
+});
+
+describe('RPC fallback', () => {
+  const failing = (chain: FakeChain, methods: RegExp) => (async (url: string, init: RequestInit) => {
+    const body = JSON.parse(String(init.body));
+    const name = body.method === 'query' ? `query:${body.params.method_name ?? body.params.request_type}` : body.method;
+    if (url === 'http://primary' && methods.test(name)) {
+      return new Response(JSON.stringify({ jsonrpc: '2.0', id: body.id, error: { name: 'HANDLER_ERROR', cause: { name: 'INTERNAL_ERROR', info: {} }, code: -32000, message: 'Server error', data: 'injected' } }), { status: 200 });
+    }
+    return chain.fetch(url, init);
+  }) as unknown as typeof fetch;
+
+  it('a transient error body on a read goes to the fallback URL, counted in /v1/health', async () => {
+    const chain = new FakeChain();
+    const c = await setup({ chain, fetchImpl: failing(chain, /^query:state$/), env: { RPC_URL: 'http://primary', RPC_FALLBACK_URL: 'http://fallback' } });
+    const s = (await req(c, '/v1/state')).json as DashboardState;
+    expect(s.snapshot.rpc_ok).toBe(true);
+    const h = (await req(c, '/v1/health')).json;
+    expect(h.rpc.fallback_answers).toBeGreaterThan(0);
+    expect(h.rpc.last_primary_error).toMatch(/INTERNAL_ERROR/);
+  });
+
+  it('send_tx is never re-sent to the fallback URL', async () => {
+    const chain = new FakeChain();
+    const c = await setup({ chain, fetchImpl: failing(chain, /^send_tx$/), env: { RPC_URL: 'http://primary', RPC_FALLBACK_URL: 'http://fallback' } });
+    const cookie = await signIn(c);
+    const r = await req(c, '/v1/agents/4/pause', { method: 'POST', body: {}, cookie });
+    expect(r.status).toBe(502);
+    expect(chain.calls.filter((x) => x.method === 'send_tx')).toHaveLength(0);
   });
 });
 

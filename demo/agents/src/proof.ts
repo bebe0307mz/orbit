@@ -5,7 +5,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { NearRpc } from '@orbit/agent';
-import type { Outcome, OutcomesView, VaultState } from '@orbit/vault-types';
+import { tokenBacking, type Outcome, type OutcomesView, type VaultState } from '@orbit/vault-types';
 import type { Purchase, RunConfig } from './run.ts';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
@@ -55,6 +55,8 @@ export const proveRun = {
     const demoSum = paid.reduce((t, p) => t + BigInt(p.amount ?? 0), 0n);
     const demoAgentIds = new Map(s.agents.filter((a) => ['research-scout', 'price-watcher', 'summary-writer', 'invoice-bot'].includes(a.name)).map((a) => [a.id, a.name]));
     const others = outs.filter((o) => !demoAgentIds.has(o.agent_id));
+    const vaultTokens = await balance(rpc, cfg.token, cfg.vault);
+    const backing = tokenBacking(vaultTokens, s);
     const checks: { check: string; ok: boolean; detail: string }[] = [];
     const c = (check: string, ok: boolean, detail: string) => checks.push({ check, ok, detail });
 
@@ -71,6 +73,7 @@ export const proveRun = {
     const unresolved = purchases.filter((p) => p.status === 'unknown');
     c('no purchase left with an unknown outcome', unresolved.length === 0, `${unresolved.length}`);
     c('nothing pending after the run', s.pending_count === 0, `pending ${s.pending_count}`);
+    c(`C2 token backing after the run (${backing.strict ? 'strict: nothing pending' : 'in-flight form'})`, backing.ok, `vault holds ${vaultTokens}, ledger requires ${backing.required}`);
 
     const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\..*/, '') + 'Z';
     const dir = join(REPO, 'harness/out', `testnet-agents-${stamp}`);

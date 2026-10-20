@@ -189,7 +189,7 @@ export function createApp(d: AppDeps) {
     if (method === 'GET' && path === '/v1/health') {
       const stale = syncer.stale();
       const body = {
-        ok: !stale && syncer.countsMatch && guardian.health.ok,
+        ok: !stale && syncer.countsMatch && guardian.health.ok && syncer.backing?.ok !== false,
         operator: !!session(req),
         rpc_ok: syncer.rpcOk,
         snapshot_age_ms: syncer.latest ? now() - syncer.latest.S.timestamp_ms : null,
@@ -200,11 +200,13 @@ export function createApp(d: AppDeps) {
         guardian: { ok: guardian.health.ok, reason: guardian.health.reason, allowance_yocto: guardian.health.allowance_yocto },
         vault_near_free_yocto: syncer.stateBody(null)?.vault.near.free_yocto ?? null,
         vault_near_low: (() => { const f = syncer.stateBody(null)?.vault.near.free_yocto; return f != null && BigInt(f) < 10n ** 24n; })(),
+        token_backing: syncer.backing,
+        rpc: rpc.stats,
         version: syncer.latest?.S.version ?? null,
         version_changed_at_block: syncer.versionChangedAtBlock,
         build: d.build ?? 'dev',
       };
-      return send(res, !stale && syncer.countsMatch ? 200 : 503, body);
+      return send(res, !stale && syncer.countsMatch && syncer.backing?.ok !== false ? 200 : 503, body);
     }
 
     m = path.match(/^\/v1\/ops\/([^/]+)$/);

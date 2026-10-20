@@ -56,6 +56,8 @@ export class FakeChain {
   failNextExec: ExecFailure | null = null;
   /** Broadcast txs are never found (tx_status UNKNOWN_TRANSACTION forever). */
   blackhole = false;
+  /** Overrides the vault's token balance (ft_balance_of), as a base-unit string. */
+  ftBalance: string | null = null;
   /** Every RPC answers HTTP status `down` while set. */
   down: number | null = null;
   calls: { method: string; params: Record<string, unknown> }[] = [];
@@ -124,8 +126,13 @@ export class FakeChain {
     this.executeDue();
     const p = req.params;
     if (req.method === 'query' && p.request_type === 'call_function') {
-      if (p.account_id !== VAULT) return { result: { error: 'wasm execution failed with error: CodeDoesNotExist', block_height: this.state.block_height, block_hash: 'h' } };
       const args = JSON.parse(Buffer.from(String(p.args_base64), 'base64').toString() || '{}');
+      if (p.account_id === this.state.token && p.method_name === 'ft_balance_of' && args.account_id === VAULT) {
+        // like the real token: in-flight payments' tokens already left in ft_transfer (still counted in reserved)
+        const bal = this.ftBalance ?? (BigInt(this.state.available) + BigInt(this.state.reserved) - BigInt(this.state.org.reserved)).toString();
+        return { result: { result: Array.from(Buffer.from(JSON.stringify(bal))), logs: [], block_height: this.state.block_height, block_hash: 'h' } };
+      }
+      if (p.account_id !== VAULT) return { result: { error: 'wasm execution failed with error: CodeDoesNotExist', block_height: this.state.block_height, block_hash: 'h' } };
       let value: unknown;
       if (p.method_name === 'state') value = this.state;
       else if (p.method_name === 'outcomes') {

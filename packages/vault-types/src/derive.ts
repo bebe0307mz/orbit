@@ -145,3 +145,23 @@ export function checkSnapshot(s: DashboardState, outcomes?: OutcomeItem[]): stri
   }
   return issues;
 }
+
+export interface TokenBacking {
+  ok: boolean;
+  /** the vault's token balance must be at least this */
+  required: bigint;
+  /** true when nothing is pending, so the full form available + reserved applies */
+  strict: boolean;
+}
+
+/**
+ * Token backing (C2): the vault's ft_balance_of must cover what the ledger accounts. While a payment is in flight its
+ * tokens have already left in ft_transfer but stay in `reserved` until the callback, so the strict form
+ * `available + reserved` applies only when pending_count == 0; otherwise `available + reserved - org.reserved`
+ * (contracts/vault/NOTES.md). The balance and the snapshot must come from the same block.
+ */
+export function tokenBacking(ftBalance: BaseUnits | bigint, s: Pick<VaultState, 'available' | 'reserved' | 'pending_count'> & { org: Pick<OrgView, 'reserved'> }): TokenBacking {
+  const strict = s.pending_count === 0;
+  const required = toBig(s.available) + toBig(s.reserved) - (strict ? 0n : toBig(s.org.reserved));
+  return { ok: toBig(ftBalance) >= required, required, strict };
+}

@@ -42,10 +42,15 @@ function errorCode(err: { name?: string; cause?: { name?: string; info?: unknown
   return find(err.data) ?? find(err.cause?.info) ?? err.cause?.name ?? err.name ?? 'rpc_error';
 }
 
+/** Server-side, transient JSON-RPC errors: another RPC node may answer. Never used for send_tx. */
+const TRANSIENT = /^(INTERNAL_ERROR|TIMEOUT_ERROR|UNKNOWN_BLOCK|NO_SYNCED_BLOCKS|NOT_SYNCED_YET|UNAVAILABLE_SHARD|GARBAGE_COLLECTED_BLOCK)$/;
+
 export class NearRpc {
   private urls: string[];
   private fetchImpl: typeof fetch;
   private id = 0;
+  /** calls answered by a URL other than the first (fallback used), and failures of the first URL */
+  readonly stats = { primary_failures: 0, fallback_answers: 0, last_primary_error: null as string | null };
 
   constructor(url: string, fallback: string | null = null, fetchImpl: typeof fetch = fetch) {
     this.urls = fallback ? [url, fallback] : [url];
@@ -54,7 +59,15 @@ export class NearRpc {
 
   async call<T>(method: string, params: unknown): Promise<T> {
     let last: RpcError | null = null;
-    for (const url of this.urls) {
+    const write = method === 'send_tx' || method === 'broadcast_tx_commit' || method === 'broadcast_tx_async';
+    for (const [i, url] of this.urls.entries()) {
+      const fail = (e: RpcError) => {
+        if (i === 0) {
+          this.stats.primary_failures++;
+          this.stats.last_primary_error = e.message;
+        }
+        return e;
+      };
       let res: Response;
       try {
         res = await this.fetchImpl(url, {
@@ -64,19 +77,26 @@ export class NearRpc {
           signal: AbortSignal.timeout(20_000),
         });
       } catch (e) {
-        last = new RpcError('rpc_unreachable', `NEAR RPC unreachable (${(e as Error).message})`);
+        last = fail(new RpcError('rpc_unreachable', `NEAR RPC unreachable (${(e as Error).message})`));
+        if (write) throw last; // a send that timed out may have landed: never re-send it elsewhere
         continue;
       }
       if (!res.ok) {
-        last = new RpcError(`HTTP_${res.status}`, res.status === 429 ? 'NEAR RPC rate limited (429)' : `NEAR RPC returned ${res.status}`);
+        last = fail(new RpcError(`HTTP_${res.status}`, res.status === 429 ? 'NEAR RPC rate limited (429)' : `NEAR RPC returned ${res.status}`));
         if (res.status === 429 || res.status >= 500) continue;
         throw last;
       }
       const body = (await res.json()) as { result?: T; error?: { name?: string; message?: string; cause?: { name?: string; info?: unknown }; data?: unknown } };
       if (body.error) {
         const code = errorCode(body.error);
-        throw new RpcError(code, `NEAR RPC ${code}${typeof body.error.data === 'string' ? ': ' + body.error.data.slice(0, 200) : ''}`, body.error.data ?? body.error.cause);
+        const err = new RpcError(code, `NEAR RPC ${code}${typeof body.error.data === 'string' ? ': ' + body.error.data.slice(0, 200) : ''}`, body.error.data ?? body.error.cause);
+        if (!write && TRANSIENT.test(code) && i < this.urls.length - 1) {
+          last = fail(err);
+          continue;
+        }
+        throw err;
       }
+      if (i > 0) this.stats.fallback_answers++;
       return body.result as T;
     }
     throw last ?? new RpcError('rpc_error', 'NEAR RPC failed');

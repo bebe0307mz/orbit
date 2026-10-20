@@ -3,6 +3,7 @@
 // Activity lists the agents' paid rows, figures equal /v1/state, screenshots in both themes. The UI checks are
 // appended to the run's proof (harness/out/testnet-agents-<utc>/summary.json). Child processes are stopped by pid.
 import { execSync, spawn } from 'node:child_process';
+import { createServer } from 'node:http';
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
@@ -37,8 +38,41 @@ const waitFor = async (url, ms = 60000) => {
   }
   throw new Error(`${url} not up`);
 };
-const stopAll = () => { for (const p of children) if (p.exitCode == null) try { process.kill(p.pid, 'SIGTERM'); } catch {} };
+const stopAll = () => { for (const p of children) if (p.exitCode == null) try { process.kill(p.pid, 'SIGTERM'); } catch {} flakyServer?.close(); };
 process.on('exit', stopAll);
+
+/* Flaky RPC in front of services/api (default on): every third read gets a real-shaped INTERNAL_ERROR body, the rest
+   is forwarded to the primary RPC; send_tx is never touched. The API must answer from its fallback URL. */
+const FLAKY = process.env.DEMO_FLAKY_RPC !== '0';
+const FLAKY_PORT = 4399;
+const flaky = { reads: 0, injected: 0, forwarded: 0 };
+let flakyServer = null;
+if (FLAKY) {
+  const upstream = RPC.split(',')[0];
+  flakyServer = createServer(async (req, res) => {
+    const chunks = [];
+    for await (const ch of req) chunks.push(ch);
+    const raw = Buffer.concat(chunks).toString();
+    const body = JSON.parse(raw || '{}');
+    res.setHeader('content-type', 'application/json');
+    if (body.method !== 'send_tx' && body.method !== 'broadcast_tx_commit' && ++flaky.reads % 3 === 0) {
+      flaky.injected++;
+      return res.end(JSON.stringify({ jsonrpc: '2.0', id: body.id, error: { name: 'HANDLER_ERROR', cause: { name: 'INTERNAL_ERROR', info: {} }, code: -32000, message: 'Server error', data: 'injected by harness/ui/check-demo.mjs' } }));
+    }
+    flaky.forwarded++;
+    try {
+      const r = await fetch(upstream, { method: 'POST', headers: { 'content-type': 'application/json' }, body: raw });
+      res.statusCode = r.status;
+      res.end(await r.text());
+    } catch {
+      res.statusCode = 502;
+      res.end('{}');
+    }
+  });
+  await new Promise((r) => flakyServer.listen(FLAKY_PORT, '127.0.0.1', r));
+}
+const API_RPC = FLAKY ? `http://127.0.0.1:${FLAKY_PORT}` : RPC.split(',')[0];
+const API_FALLBACK = FLAKY ? (RPC.split(',')[1] ?? 'https://test.rpc.fastnear.com') : (RPC.split(',')[1] ?? '');
 
 const password = 'demo-run-' + Math.random().toString(36).slice(2);
 const pwHash = execSync(`node ${NODE_TS.join(' ')} src/cli.ts hash-password`, { cwd: join(root, 'services/api'), input: password }).toString().trim();
@@ -48,7 +82,7 @@ execSync(`pnpm exec vite build --outDir ${distApi} --emptyOutDir --logLevel warn
 const ORIGIN = `http://127.0.0.1:${API_PORT}`;
 const api = spawnLogged('api', 'node', [...NODE_TS, 'src/main.ts'], {
   cwd: join(root, 'services/api'),
-  env: { ...process.env, NEAR_NETWORK: 'testnet', VAULT_ACCOUNT: VAULT, RPC_URL: RPC.split(',')[0], RPC_FALLBACK_URL: RPC.split(',')[1] ?? '', DB_PATH: join(work, 'api.sqlite'), GUARDIAN_KEY_FILE: KEY_FILE, OPERATOR_PASSWORD_HASH: pwHash, SESSION_SECRET: 'demo-' + Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2), PUBLIC_ORIGIN: ORIGIN, PORT: String(API_PORT), HOST: '127.0.0.1', DASHBOARD_DIR: distApi },
+  env: { ...process.env, NEAR_NETWORK: 'testnet', VAULT_ACCOUNT: VAULT, RPC_URL: API_RPC, RPC_FALLBACK_URL: API_FALLBACK, DB_PATH: join(work, 'api.sqlite'), GUARDIAN_KEY_FILE: KEY_FILE, OPERATOR_PASSWORD_HASH: pwHash, SESSION_SECRET: 'demo-' + Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2), PUBLIC_ORIGIN: ORIGIN, PORT: String(API_PORT), HOST: '127.0.0.1', DASHBOARD_DIR: distApi },
 });
 // services/merchant uses TypeScript parameter properties, which strip-only mode rejects
 const merchant = spawnLogged('merchant', 'node', ['--experimental-transform-types', '--no-warnings=ExperimentalWarning', 'src/main.ts'], {
@@ -72,7 +106,19 @@ const agents = spawn('node', [...NODE_TS, 'src/main.ts', 'run', '--minutes', MIN
   env: { ...process.env, NEAR_NETWORK: 'testnet', VAULT_ACCOUNT_ID: VAULT, NEAR_RPC_URL: RPC, MERCHANT_URL: `http://127.0.0.1:${MERCHANT_PORT}`, MERCHANT_ACCOUNT_ID: MERCHANT, TOKEN_ACCOUNT_ID: TOKEN, ORBIT_API_URL: ORIGIN, DEMO_LOG: demoLog },
 });
 children.push(agents);
+// sample health during the run: the token-backing check must hold also while payments are in flight
+const samples = { n: 0, inflight: 0, bad: [] };
+const sampler = setInterval(async () => {
+  try {
+    const h = await (await fetch(`${ORIGIN}/v1/health`)).json();
+    if (!h.token_backing) return;
+    samples.n++;
+    if (!h.token_backing.strict) samples.inflight++;
+    if (!h.token_backing.ok) samples.bad.push(h.token_backing);
+  } catch {}
+}, 2000);
 const agentsCode = await new Promise((r) => agents.on('close', r));
+clearInterval(sampler);
 const proofDir = readdirSync(join(OUT, '..')).filter((d) => d.startsWith('testnet-agents-') && !before.has(d)).sort().pop();
 group('demo run');
 ok(agentsCode === 0, `demo:agents run --proof exited ${agentsCode}`);
@@ -97,6 +143,9 @@ try {
   }
   const st = await (await fetch(`${ORIGIN}/v1/state`)).json();
   uiOk('services/api synced every outcome of the run', st.sync.last_seq === st.counts.next_seq - 1 && st.sync.counts_match, `last_seq ${st.sync.last_seq}, next_seq ${st.counts.next_seq}`);
+  const health = await (await fetch(`${ORIGIN}/v1/health`)).json();
+  uiOk('services/api token backing (C2) held at every health sample during the run, in-flight form while payments were pending', samples.n > 0 && samples.bad.length === 0 && health.token_backing?.ok === true, `${samples.n} samples, ${samples.inflight} in flight, ${samples.bad.length} short; final: holds ${health.token_backing?.balance}, requires ${health.token_backing?.required}`);
+  if (FLAKY) uiOk('services/api RPC fallback: injected INTERNAL_ERROR reads answered by the fallback URL', health.rpc.fallback_answers > 0 && health.rpc_ok && st.sync.counts_match, `${flaky.injected} injected of ${flaky.reads} reads, ${health.rpc.fallback_answers} fallback answers, rpc_ok ${health.rpc_ok}`);
   const act = await (await fetch(`${ORIGIN}/v1/activity?status=paid&limit=100`)).json();
   const listed = act.items.filter((i) => paidIds.has(i.payment_id));
   uiOk('every paid purchase is listed by /v1/activity', listed.length === paidIds.size, `${listed.length} of ${paidIds.size}`);

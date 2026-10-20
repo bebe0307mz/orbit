@@ -1,7 +1,7 @@
 // Syncer (docs 4-data-api.md 4.3): state() every tick, outcomes() catch-up from last_seq + 1, gap detection,
 // counter cross-check, version watch. The in-memory snapshot is what every read endpoint serves.
 import {
-  OUTCOMES_MAX_LIMIT, freeYocto, orgRemaining,
+  OUTCOMES_MAX_LIMIT, freeYocto, orgRemaining, tokenBacking,
   type DashboardState, type Network, type OutcomesView, type SyncStatus, type VaultState,
 } from '@orbit/vault-types';
 import type { Store } from './db.ts';
@@ -9,6 +9,7 @@ import type { Logger } from './log.ts';
 import { RpcError, type NearRpc } from './rpc.ts';
 
 const PAGES_PER_TICK = 10;
+const BACKING_EVERY = 5;
 
 export interface Snapshot {
   S: VaultState;
@@ -30,6 +31,9 @@ export class Syncer {
   caughtUp = false;
   countsMatch = true;
   versionChangedAtBlock: number | null = null;
+  /** C2 token backing, checked every BACKING_EVERY ticks at the snapshot's block */
+  backing: { ok: boolean; balance: string; required: string; strict: boolean; block_height: number } | null = null;
+  private ticks = 0;
   private rpc: NearRpc;
   private store: Store;
   private log: Logger;
@@ -116,6 +120,26 @@ export class Syncer {
       const was = this.countsMatch;
       this.countsMatch = countsMatch(this.store, S);
       if (!this.countsMatch && was) this.log.critical('counts_mismatch', { chain: S.counts, db: this.store.kindCounts(), gaps: this.store.gaps() });
+    }
+
+    // C2 token backing (in-flight safe), every few ticks; the balance is read at the snapshot's block
+    if (this.ticks++ % BACKING_EVERY === 0) {
+      try {
+        let bal: string;
+        try {
+          bal = (await this.rpc.view<string>(S.token, 'ft_balance_of', { account_id: this.opts.vaultAccount }, { block_id: S.block_height })).value;
+        } catch {
+          bal = '';
+        }
+        if (bal) {
+          const b = tokenBacking(bal, S);
+          const was = this.backing?.ok ?? true;
+          this.backing = { ok: b.ok, balance: bal, required: b.required.toString(), strict: b.strict, block_height: S.block_height };
+          if (!b.ok && was) this.log.critical('token_backing_short', this.backing);
+        }
+      } catch (e) {
+        this.log.warn('token_backing_read_failed', { error: (e as Error).message });
+      }
     }
 
     // 7. version watch
