@@ -53,7 +53,7 @@ function RemCell({ a, s, dec }: { a: ApiAgent; s: DashboardState; dec: number })
 function Figures({ s }: { s: DashboardState }) {
   const v = s.vault;
   // reserve each figure's width for its largest possible value at three decimals, so updates never shift the row
-  const room = (max: string) => ({ minWidth: `${fmtUsd(max).length + 1}ch` });
+  const room = (max: string) => ({ minWidth: `${fmtUsd(max).length + 2}ch` }); // +1 third decimal, +1 for "$" being wider than a digit
   return (
     <div className="figs">
       <div className="fig">

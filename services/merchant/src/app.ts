@@ -86,7 +86,12 @@ export function createMerchant(cfg: MerchantConfig) {
     if (inv.used_at != null) throw new Refusal('invoice_used', 'Invoice already redeemed');
     if (inv.resource !== resource) throw new Refusal('payment_mismatch', 'Invoice was for another resource');
     const p = await cfg.rpc.view<PaymentView | null>(cfg.vault, 'payment', { payment_id: proof.payment_id });
-    if (!p) throw new Refusal('payment_not_found', 'No payment for this invoice on the vault');
+    if (!p) {
+      // The agent's SDK returns once the pay tx is EXECUTED; this read is at finality final, a block or two later.
+      // Until the invoice deadline a missing payment may simply not be final yet: answer retryable payment_pending.
+      if (now() <= inv.deadline_ms) throw new Refusal('payment_pending', 'Payment not visible at final yet', 2);
+      throw new Refusal('payment_not_found', 'No payment for this invoice on the vault');
+    }
     if (p.merchant !== cfg.merchant || p.amount !== inv.amount) throw new Refusal('payment_mismatch', 'Payment is for another merchant or amount');
     if (p.status === 'pending') throw new Refusal('payment_pending', 'Payment not settled yet', 2);
     if (p.status !== 'paid') throw new Refusal('payment_failed', 'Payment failed and was refunded');

@@ -247,6 +247,10 @@ const SHOTS = [
 const steps = [
   ['vault-types', () => vitest('vault-types', 'packages/vault-types (formatting, formulas, CLI strings)', 'packages/vault-types')],
   ['demo-agents', () => vitest('demo-agents', 'demo/agents (decision logic, reactions to rejections)', 'demo/agents')],
+  ['orbit-agent', () => vitest('orbit-agent', 'packages/orbit-agent (SDK: pay, orbitFetch, keys)', 'packages/orbit-agent')],
+  ['orbit-cli', () => vitest('orbit-cli', 'tools/orbit-cli (grammar, signer)', 'tools/orbit-cli')],
+  ['merchant', () => vitest('merchant', 'services/merchant (402 invoices, on-chain verification)', 'services/merchant')],
+  ['attack', () => vitest('attack', 'demo/attack (attack scenes)', 'demo/attack')],
   ['dashboard', () => vitest('dashboard', 'apps/dashboard (mock, RPC and API sources)', 'apps/dashboard')],
   ['api', () => vitest('api', 'services/api (syncer, API, guardian, auth on a fake chain)', 'services/api')],
   ['contracts', cargo],

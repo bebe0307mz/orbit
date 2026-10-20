@@ -44,6 +44,20 @@ async function matrix() {
     const rowTops = await o.page.evaluate(() => ['.topbar .wordmark', '.topbar .badges', '.topbar .right'].map((q) => Math.round(document.querySelector(q).getBoundingClientRect().top)));
     ok(new Set(rowTops).size === 1, `header row 1 stays one line (tops ${rowTops.join(',')})`);
     await checkFigures(o.page, 'agents');
+    // header figures reserve room for three decimals: swapping in the widest realistic values must not move any figure
+    if (width > 767) {
+      const lefts = () => o.page.$$eval('.figs .fig', (f) => f.map((x) => Math.round(x.getBoundingClientRect().left)).join(','));
+      const before = await lefts();
+      const moved = [];
+      for (const vals of [['$19.999', '$4.999', '$4.999', '$4.999'], ['$0.001', '$0.001', '$0.001', '$0.001'], ['$20.00', '$5.00', '$5.00', '$5.00']]) {
+        await o.page.evaluate((v) => document.querySelectorAll('.figs .fig .v').forEach((el, i) => { if (v[i]) el.textContent = v[i]; }), vals);
+        const now = await lefts();
+        if (now !== before) moved.push(`${vals.join(' ')} -> ${now}`);
+      }
+      ok(moved.length === 0, `header figures keep their place for 2- and 3-decimal values (${before}${moved.length ? '; moved: ' + moved.join('; ') : ''})`);
+      await o.page.reload();
+      await o.page.waitForSelector('[data-check="vault.balance"]');
+    }
     await noHScroll(o.page, 'agents');
     await copyRules(o.page, 'agents');
     await shot(o.page, `agents-${theme}-${width}`);

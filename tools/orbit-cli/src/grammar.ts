@@ -98,7 +98,8 @@ export function parse(tokens: string[], fromPaste = false): Command {
     }
     const v = rest[++i];
     if (v === undefined) throw new GrammarError(`--${name} needs a value`);
-    flags[name] = checkValue(name, type, v);
+    // a merchant's display name is shown to people ("Orbit Data demo"); agent names stay [a-z0-9-]
+    flags[name] = checkValue(name, verb === 'add-merchant' && name === 'name' ? 'text' : type, v);
   }
   for (const r of spec.req) if (!(r in flags)) throw new GrammarError(`${verb} needs --${r}`);
   if (verb === 'register-agent' && !flags['from-dir'] && !(flags.name && flags['public-key'])) {

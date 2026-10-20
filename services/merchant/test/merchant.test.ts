@@ -87,7 +87,7 @@ describe('merchant', () => {
 
   it('refuses every bad proof without serving (T-40)', async () => {
     const cases: [string, (id: string, res: string) => string, unknown][] = [
-      ['payment_not_found', (id, res) => proof(a1, id, res), null],
+      ['payment_pending', (id, res) => proof(a1, id, res), null], // not visible at final yet, invoice still valid
       ['payment_mismatch', (id, res) => proof(a1, id, res), paid(1, { merchant: 'other.testnet' })],
       ['payment_mismatch', (id, res) => proof(a1, id, res), paid(1, { amount: '40000' })],
       ['payment_pending', (id, res) => proof(a1, id, res), paid(1, { status: 'pending' })],
@@ -105,6 +105,23 @@ describe('merchant', () => {
       if (code === 'payment_pending') expect(r.retryAfter).toBe('2');
     }
     expect(reports).toEqual([]);
+  });
+
+  it('a payment not yet visible at final is retryable until the invoice deadline, then payment_not_found', async () => {
+    let t = Date.now();
+    const m = createMerchant({
+      vault: VAULT, merchant: ME, asset: 'otusd.testnet', network: 'near:testnet', rpc: new NearRpc('http://rpc', chainFetch),
+      price: '50000', invoiceTtlMs: 120_000, dbPath: ':memory:', apiUrl: 'http://api', fetchImpl: chainFetch, now: () => t,
+    });
+    const inv = m.issue('GET /v1/quote?symbol=NEAR');
+    const header = proof(a1, inv.payment_id, inv.resource);
+    await expect(m.verify(header, inv.resource)).rejects.toMatchObject({ code: 'payment_pending', retryAfter: 2 });
+    payments[inv.payment_id] = paid(1); // final now
+    await expect(m.verify(header, inv.resource)).resolves.toMatchObject({ payment_id: inv.payment_id });
+    const late = m.issue('GET /v1/quote?symbol=NEAR');
+    t += 121_000;
+    await expect(m.verify(proof(a1, late.payment_id, late.resource), late.resource)).rejects.toMatchObject({ code: 'payment_not_found' });
+    m.close();
   });
 
   it('a proof for one resource cannot redeem another path', async () => {

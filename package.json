@@ -17,6 +17,7 @@
     "demo:attack": "node --experimental-strip-types --no-warnings=ExperimentalWarning demo/attack/src/main.ts",
     "orbit-cli": "node --experimental-strip-types --no-warnings=ExperimentalWarning tools/orbit-cli/src/main.ts",
     "merchant": "pnpm --filter @orbit/merchant start",
-    "demo:agents": "pnpm --silent --filter @orbit/demo-agents start"
+    "demo:agents": "pnpm --silent --filter @orbit/demo-agents start",
+    "demo:setup": "node --experimental-strip-types --no-warnings=ExperimentalWarning demo/agents/src/setup.ts"
   }
 }

@@ -161,6 +161,14 @@ async function apiUi() {
     await p.waitForSelector('[data-check="vault.balance"]', { timeout: 30000 });
     await checkFigures(p, 'agents', apiState);
     ok(await p.locator('[data-testid="sample-badge"]').count() === 0, 'no Sample data badge');
+    if (process.env.TESTNET_EXPECT_AGENTS) {
+      // e.g. "research-scout,price-watcher,summary-writer,invoice-bot,rogue-agent,burst-.*": every listed agent must match
+      const allowed = process.env.TESTNET_EXPECT_AGENTS.split(',').map((x) => new RegExp(`^${x}$`));
+      const names = await p.$$eval('tr.row .nm', (els) => els.map((e) => e.textContent.trim()));
+      const extra = names.filter((n) => !allowed.some((re) => re.test(n)));
+      const target = width === 1440 && theme === 'dark';
+      (target ? check : ok)('dashboard lists only the demo agents', names.length > 0 && extra.length === 0, `${names.length} agents: ${names.join(', ')}${extra.length ? ` · unexpected: ${extra.join(', ')}` : ''}`);
+    }
     await noHScroll(p, 'agents');
     await copyRules(p, 'agents');
     if (width >= 1024) {

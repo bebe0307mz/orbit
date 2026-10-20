@@ -14,6 +14,12 @@ describe('grammar', () => {
     for (const bad of ['0.0000001', '-1', '1e3', '1,0', '1234567']) expect(() => usdcToBase(bad)).toThrow(GrammarError);
   });
 
+  it('add-merchant takes a readable display name; agent names stay strict', () => {
+    expect(parse(['add-merchant', '--network', 'testnet', '--account', 'm.testnet', '--name', 'Orbit Data testnet demo']).flags.name).toBe('Orbit Data testnet demo');
+    expect(() => parse(['register-agent', '--network', 'testnet', '--name', 'Research Bot', '--public-key', PK, '--daily', '1', '--per-payment', '0.1'])).toThrow(GrammarError);
+    expect(() => parse(['add-merchant', '--network', 'testnet', '--account', 'm.testnet', '--name', 'x; rm -rf /'])).toThrow(GrammarError);
+  });
+
   it('accepts every string the dashboard builds (vault-types builders)', () => {
     const strings = [
       cmdRegister('testnet', { name: 'research-bot', publicKey: PK, daily: '1.00', perPayment: '0.10' }),

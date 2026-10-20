@@ -18,7 +18,7 @@ const MINUTES = process.env.DEMO_MINUTES || '4';
 const API_PORT = 4397;
 const MERCHANT_PORT = 4398;
 const NODE_TS = ['--experimental-strip-types', '--no-warnings=ExperimentalWarning'];
-const work = join(OUT, '..', 'demo-run');
+const work = join(OUT, '..', 'demo-run', VAULT); // one API and merchant database per vault
 mkdirSync(work, { recursive: true });
 const children = [];
 const spawnLogged = (name, cmd, args, opts) => {
@@ -104,23 +104,34 @@ let browser = await chromium.launch({ executablePath: EXE });
 use(browser, `${ORIGIN}/`);
 const live = { top: null, scrolled: null, panel: null };
 live.top = await open({ theme: 'dark', hash: '#/activity' });
-live.scrolled = await open({ theme: 'dark', hash: '#/activity', height: 700 });
+live.scrolled = await open({ theme: 'dark', hash: '#/activity', height: 520 });
 const s0 = await (await fetch(`${ORIGIN}/v1/state`)).json();
 const watched = s0.agents.find((a) => a.name === 'price-watcher');
 live.panel = await open({ theme: 'light', hash: `#/agents?agent=${watched?.id ?? 11}` });
-for (const o of [live.top, live.scrolled]) await o.page.waitForFunction(() => document.querySelectorAll('tr.row').length >= 20, null, { timeout: 30000 });
-await live.panel.page.waitForSelector('#panel .tx1', { timeout: 30000 }).catch(() => {});
-await live.scrolled.page.evaluate(() => window.scrollTo(0, 420));
-await live.scrolled.page.waitForTimeout(300);
-for (const o of Object.values(live)) await o.page.evaluate(() => { window.__noReload = true; });
+// a fresh vault shows "No payments yet"; a used one shows rows
+for (const o of [live.top, live.scrolled]) await o.page.waitForSelector('[data-testid="empty-activity"], tr.row', { timeout: 30000 });
+await live.panel.page.waitForSelector('#panel', { timeout: 30000 });
+// web fonts first: a sample taken before IBM Plex loads measures the fallback font
+for (const o of Object.values(live)) await o.page.evaluate(async () => { await document.fonts.ready; window.__noReload = true; });
 const L = { figLefts: new Set(), spread: {}, samples: 0, topKeys: new Set(), topFirst: [], rowsStart: 0, rowsMax: 0, anchorDrift: 0, anchorChecks: 0, scrollYStart: 0, scrollYEnd: 0, fresh: 0, inflightSeen: 0, inflightShot: false, freshShot: false, panelFirst: new Set(), reloads: 0 };
 L.rowsStart = await live.top.page.$$eval('tr.row', (r) => r.length);
-L.scrollYStart = await live.scrolled.page.evaluate(() => window.scrollY);
-const anchorKey = await live.scrolled.page.evaluate(() => {
-  const h = document.querySelector('.topbar').getBoundingClientRect().bottom;
-  const r = Array.from(document.querySelectorAll('tr.row')).find((x) => x.getBoundingClientRect().top >= h);
-  return r ? { key: r.dataset.key, top: r.getBoundingClientRect().top } : null;
-});
+// the scrolled reader: once there are rows below the fold, scroll down and pin the first visible row (lazily, so it
+// also works on a fresh vault)
+let anchorKey = null;
+const pinAnchor = async () => {
+  const p = live.scrolled.page;
+  const can = await p.evaluate(() => document.documentElement.scrollHeight - window.innerHeight > 240 && document.querySelectorAll('tr.row').length >= 6);
+  if (!can) return;
+  await p.evaluate(() => window.scrollTo(0, 200));
+  await p.waitForTimeout(200);
+  L.scrollYStart = await p.evaluate(() => window.scrollY);
+  anchorKey = await p.evaluate(() => {
+    const h = document.querySelector('.topbar').getBoundingClientRect().bottom;
+    const r = Array.from(document.querySelectorAll('tr.row')).find((x) => x.getBoundingClientRect().top >= h);
+    return r ? { key: r.dataset.key, top: r.getBoundingClientRect().top } : null;
+  });
+};
+await pinAnchor();
 let sampling = true;
 const sampleLoop = (async () => {
   while (sampling) {
@@ -133,7 +144,8 @@ const sampleLoop = (async () => {
       L.broken = Math.max(L.broken ?? 0, t.broken);
       if (!t.ok) L.reloads++;
       if (t.fresh && !L.freshShot) { L.freshShot = true; await shot(live.top.page, 'demo-live-activity-new-row-dark'); }
-      if (anchorKey) {
+      if (!anchorKey) await pinAnchor();
+      else {
         const a = await live.scrolled.page.evaluate((k) => { const el = document.querySelector(`tr.row[data-key="${CSS.escape(k)}"]`); return el ? { top: el.getBoundingClientRect().top, y: window.scrollY, ok: window.__noReload === true } : null; }, anchorKey.key);
         if (a) { L.anchorChecks++; L.anchorDrift = Math.max(L.anchorDrift, Math.abs(a.top - anchorKey.top)); L.scrollYEnd = a.y; if (!a.ok) L.reloads++; }
       }
