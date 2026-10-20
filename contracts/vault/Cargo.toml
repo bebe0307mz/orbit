@@ -12,6 +12,8 @@ crate-type = ["cdylib", "rlib"]
 [features]
 # Mainnet build: pins Circle USDC and caps float_cap at 20 USDC.
 mainnet = []
+# Test-only build (sandbox T-35): `migrate` panics, so an upgrade to it must revert the deploy.
+test-migrate-panic = []
 
 [dependencies]
 near-sdk = "5.27"

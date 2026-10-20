@@ -36,3 +36,41 @@ Builds: `scripts/build-contracts.sh` (cargo-near 0.22, rust 1.86, near-sdk 5.27)
 ## Testnet deployment (2026-10-20)
 
 Vault `orbit-vault-fkuc.testnet`, owner `orbit-owner-fkuc.testnet`, token `orbit-token-fkuc.testnet` (otusd), merchant `orbit-merchant-fkuc.testnet`, unlisted `orbit-unlisted-fkuc.testnet`. Deploy key deleted. Guardian key file (NEAR credentials JSON, mode 600, outside the repo): `~/.near-credentials/orbit-testnet/orbit-vault-fkuc.testnet/guardian.json`, added at init with methods exactly `pause_agent,pause_all`.
+
+## Mainnet readiness checklist (nothing deployed)
+
+Must be true first:
+- [ ] `scripts/test-contracts.sh` green (22 unit, sandbox PASS with 0 FAIL), plus `ORBIT_MIDNIGHT=1` sandbox T-12 green once.
+- [ ] Testnet: `scripts/testnet-proof.sh` and `pnpm demo:attack --agent <name>` / `--burst` green on a vault deployed from the same commit (the fkuc testnet vaults run an earlier build, code_hash `4LRJE2Wt...`).
+- [ ] Mainnet build: `cd contracts/vault && cargo near build non-reproducible-wasm --no-abi --features mainnet`, then copy `target/near/orbit_vault/orbit_vault.wasm` to `orbit_vault_mainnet.wasm`. That build pins Circle USDC `17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1` and refuses `float_cap > 20 USDC` in `new`. Record its sha256 and base58 code hash in the README before deploying.
+- [ ] Circle USDC behavior (E4, S-2 mainnet): one tiny payment to a merchant that is not registered on USDC must settle `failed:transfer_failed` with a full refund. Do it once, right after deploy, with an extra demo agent and merchant you then remove.
+- [ ] Guardian key generated on the API VM (`pnpm api keygen`); only its public key comes to the founder machine.
+- [ ] Demo copy updated: a re-broadcast returns the original outcome, it is not "refused by RPC".
+
+Accounts (founder creates):
+- `orbit-vault.<team>.near`, funded with 10 NEAR, with one full-access deploy key K0 on the founder machine.
+- Owner `<founder>.near` (full-access key on the founder machine): about 1 NEAR for gas and storage deposits, plus the USDC float.
+- Merchant `orbit-data.<team>.near` (Orbit-run), and `unlisted-shop.<team>.near` (never allowlisted), each about 0.1 NEAR.
+
+NEAR budget for the vault account (measured on testnet unless noted):
+| Item | NEAR |
+|---|---|
+| Code (278 KB) plus state at init (ring, about 328 KB total) | 3.3 locked |
+| Each reserved payment, kept forever | 0.0013 |
+| `pay` refuses below this free balance (`STORAGE_FLOOR`) | 0.5 |
+| Gas actually burnt per pay (charged to the vault, bounded by the key allowance) | about 0.0007 |
+| Concurrent pays are pre-charged against the allowance and the vault balance until they settle: a 20-payment burst needs a 3 NEAR allowance (1 NEAR allows about 16) and that much free vault NEAR at that moment | up to 3 |
+| Margin | 2 |
+Total: 10 NEAR covers 4 demo agents (1 NEAR allowance each), one burst at a time (3 NEAR allowance) and about 1,000 payments. Allowances are caps, not locked funds; `refill-agent` renews them.
+
+USDC: 25 USDC to the owner. The first deposit of 25 proves the clamp (20 accepted, 5 refunded, T-27). Demo spend: a burst agent spends exactly $0.25; the `harness:mainnet` list about $0.95.
+
+What the founder signs, in order (all from the founder machine, `ORBIT_ALLOW_MAINNET=1`, each prints the decoded call and waits for `yes`):
+1. `orbit-cli deploy --network mainnet --wasm target/near/orbit_vault/orbit_vault_mainnet.wasm --guardian-pk <pk from VM> --float-cap 20 --org-daily 5` signs with K0: deploy + `new` (one tx), then the owner signs `storage_deposit(vault)` on USDC, then K0 signs `DeleteKey(K0)`. Check: `code_hash ... match`, key list = guardian only, status all `OK`.
+2. `orbit-cli storage-deposit --account orbit-data.<team>.near` (owner, if the merchant is not registered on USDC yet).
+3. `orbit-cli add-merchant --account orbit-data.<team>.near --name orbit-data` (refuses an account not registered on USDC).
+4. `orbit-cli register-agent --name <n> --public-key <pk> --daily 1 --per-payment 0.10 --allowance 1` for the 4 demo agents; burst agents `--daily 0.25 --per-payment 0.10 --allowance 3`, one fresh agent per burst run. Each checks the new key is FunctionCall(vault, ["pay"]).
+5. `orbit-cli deposit --amount 25` (`ft_transfer_call` on USDC, 1 yocto): expect accepted 20, refunded 5.
+6. `orbit-cli status --network mainnet`: C1, C2, C3, C5 and free NEAR all `OK`. Publish the code hash, wasm sha256, build command, init args and tx hashes.
+
+After deploy: `services/api` starts with the guardian key and checks it is exactly `pause_agent,pause_all`; the owner fallback for a failed UI pause is `orbit-cli pause-agent --network mainnet --agent <id>`. No `upgrade` after day 13 12:00 UTC.

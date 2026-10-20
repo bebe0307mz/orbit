@@ -24,6 +24,7 @@ export const VERBS: Record<string, { req: string[]; opt: string[]; mutates: bool
   'token-mint': { req: ['amount'], opt: ['to'], mutates: true },
   deposit: { req: ['amount'], opt: [], mutates: true },
   withdraw: { req: ['amount'], opt: [], mutates: true },
+  'storage-deposit': { req: ['account'], opt: [], mutates: true },
   'add-merchant': { req: ['account', 'name'], opt: ['allow-unregistered'], mutates: true },
   'remove-merchant': { req: ['account'], opt: [], mutates: true },
   'register-agent': { req: ['daily', 'per-payment'], opt: ['name', 'public-key', 'allowance', 'from-dir'], mutates: true },

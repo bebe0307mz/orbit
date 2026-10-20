@@ -235,6 +235,13 @@ async function run(ctx: Ctx): Promise<void> {
       await ownerCall(ctx, 'withdraw', { amount: amount.toString() }, [`amount ${fmtUsdc(amount)} to ${ctx.owner}`]);
       return;
     }
+    case 'storage-deposit': {
+      guardMainnet(ctx);
+      const account = f.account as string;
+      await confirm(ctx, [`${ctx.cmd.network}: ${ctx.token}.storage_deposit(${account}, registration_only) paid by ${ctx.owner} (0.01 NEAR attached, excess refunded)`]);
+      printResult(ctx, 'storage_deposit', await owner(ctx).call(ctx.token, 'storage_deposit', { account_id: account, registration_only: true }, { deposit: 10n ** 22n, gas: 30n * TGAS }));
+      return;
+    }
     case 'add-merchant': {
       const account = f.account as string;
       const reg = await ctx.rpc.view<unknown>(ctx.token, 'storage_balance_of', { account_id: account });

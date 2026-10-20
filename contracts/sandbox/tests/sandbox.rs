@@ -24,7 +24,11 @@ const ONE_YOCTO: NearToken = NearToken::from_yoctonear(1);
 const PAY_GAS: Gas = Gas::from_tgas(60);
 
 fn wasm(name: &str) -> Vec<u8> {
-    let p = format!("{}/../../target/near/{name}/{name}.wasm", env!("CARGO_MANIFEST_DIR"));
+    wasm_file(name, name)
+}
+
+fn wasm_file(dir: &str, file: &str) -> Vec<u8> {
+    let p = format!("{}/../../target/near/{dir}/{file}.wasm", env!("CARGO_MANIFEST_DIR"));
     std::fs::read(&p).unwrap_or_else(|_| panic!("missing {p}: run scripts/build-contracts.sh"))
 }
 
@@ -1093,6 +1097,127 @@ async fn t18_t34(w: &Worker<Sandbox>) -> Result<String> {
     Ok(format!("pause at block {pause_block} before payment_paid at block {pb}; removed merchant and revoked agent: in-flight payments settled paid; pending id duplicate; next pays agent_paused / merchant_not_allowed"))
 }
 
+/// T-35 (panicking migrate): an upgrade whose `migrate` panics reverts the deploy in the same receipt.
+async fn t35b(w: &Worker<Sandbox>) -> Result<String> {
+    let env = Env::new(w, "t35b", Cfg::default()).await?;
+    expect_status!(env.pay(1, &pid("t35b", 1), env.m1.id(), 50_000).await?, "paid");
+    let code_before = format!("{:?}", env.w.view_account(&env.vault).await?.contract_state);
+    let before = env.state().await?;
+    let r = env.owner.call(&env.vault, "upgrade").args(wasm_file("orbit_vault", "orbit_vault_migrate_panic")).deposit(ONE_YOCTO).max_gas().transact().await?;
+    let fails: Vec<String> = r.receipt_failures().into_iter().map(|o| format!("{:?}", (*o).clone().into_result().err())).collect();
+    ensure!(fails.iter().any(|f| f.contains("E_STATE") && f.contains("migrate always fails")), "expected the deploy+migrate receipt to fail: {fails:?}");
+    ensure!(!r.logs().iter().any(|l| l.contains("\"upgraded\"")), "upgraded event emitted for a reverted upgrade");
+    let code_after = format!("{:?}", env.w.view_account(&env.vault).await?.contract_state);
+    ensure!(code_before == code_after, "code changed: {code_before} -> {code_after}");
+    let after = env.state().await?;
+    for k in ["available", "paid_total", "counts", "agents", "org", "version"] {
+        ensure!(before[k] == after[k], "state {k} changed");
+    }
+    expect_status!(env.pay(1, &pid("t35b", 2), env.m1.id(), 50_000).await?, "paid");
+    env.check(true).await?;
+    Ok(format!("upgrade receipt failed E_STATE in migrate; code unchanged {code_after}; state identical; pay still works"))
+}
+
+/// T-50, T-51 via state patching: free NEAR below 0.5 makes pay fail closed while pause works;
+/// a pending payment still settles with zero free NEAR (storage-neutral callback).
+async fn t50_t51(w: &Worker<Sandbox>) -> Result<String> {
+    let env = Env::new(w, "t50", Cfg::default()).await?;
+    let acct = env.w.view_account(&env.vault).await?;
+    let storage_cost = acct.storage_usage as u128 * 10u128.pow(19);
+    let original = acct.balance;
+    let set_free = |free: u128| {
+        let env = &env;
+        async move {
+            env.w
+                .patch(&env.vault)
+                .account_from_current(move |a| near_workspaces::types::AccountDetailsPatch::from(a).balance(NearToken::from_yoctonear(storage_cost + free)))
+                .transact()
+                .await
+        }
+    };
+    // T-50: 0.4 NEAR free.
+    set_free(400_000_000_000_000_000_000_000).await?;
+    let before = env.state().await?;
+    let o = env.pay(1, &pid("t50", 1), env.m1.id(), 50_000).await?;
+    ensure!(o.status() == "panic:E_STORAGE_LOW", "pay at 0.4 NEAR free: {}", o.status());
+    classify(env.guardian.call(&env.vault, "pause_agent").args_json(json!({"agent_id": 2})).transact().await).ok()?;
+    let after = env.state().await?;
+    ensure!(before["counts"] == after["counts"] && before["available"] == after["available"], "state changed by E_STORAGE_LOW");
+    ensure!(Env::agent_state(&after, 2)["status"] == "paused", "pause not applied at low NEAR");
+    env.w.patch(&env.vault).account_from_current(move |a| near_workspaces::types::AccountDetailsPatch::from(a).balance(original)).transact().await?;
+
+    // T-51: reserve with a delayed transfer, then leave zero free NEAR before the callback runs.
+    env.owner.call(&env.ft, "set_delay_hops").args_json(json!({"hops": 8})).transact().await?.into_result()?;
+    let id = pid("t51", 1);
+    let deadline = env.now_ms().await? + 120_000;
+    let st = env.agent(1).acct.call(&env.vault, "pay")
+        .args_json(json!({"payment_id": id, "merchant": env.m1.id(), "amount": "50000", "deadline_ms": deadline}))
+        .gas(Gas::from_tgas(300)).transact_async().await?;
+    let t = Instant::now();
+    loop {
+        let p: Value = env.w.view(&env.vault, "payment").args_json(json!({"payment_id": id})).await?.json()?;
+        if p["status"] == "pending" { break; }
+        ensure!(t.elapsed() < Duration::from_secs(30), "never pending");
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    let su = env.w.view_account(&env.vault).await?.storage_usage;
+    env.w.patch(&env.vault).account_from_current(move |a| near_workspaces::types::AccountDetailsPatch::from(a).balance(NearToken::from_yoctonear(su as u128 * 10u128.pow(19)))).transact().await?;
+    let r = st.await?;
+    let v: Value = r.json()?;
+    ensure!(v["status"] == "paid", "callback at zero free NEAR: {v}");
+    let su2 = env.w.view_account(&env.vault).await?.storage_usage;
+    ensure!(su2 <= su, "storage grew in the callback: {su} -> {su2}");
+    env.w.patch(&env.vault).account_from_current(move |a| near_workspaces::types::AccountDetailsPatch::from(a).balance(original)).transact().await?;
+    env.owner.call(&env.ft, "set_delay_hops").args_json(json!({"hops": 0})).transact().await?.into_result()?;
+    env.check(true).await?;
+    Ok(format!("0.4 NEAR free: pay E_STORAGE_LOW, guardian pause applied; zero free NEAR: pending payment settled paid, storage {su} -> {su2}"))
+}
+
+/// T-12 in the sandbox (opt-in ORBIT_MIDNIGHT=1, 5 to 40 min): fast_forward to just before a real UTC midnight
+/// (about 0.3 s of block time per forwarded block), reserve before it, settle after it.
+async fn t12_sandbox(w: &Worker<Sandbox>) -> Result<String> {
+    if std::env::var("ORBIT_MIDNIGHT").ok().as_deref() != Some("1") {
+        bail!("SKIP: set ORBIT_MIDNIGHT=1 (fast_forward to the next UTC midnight takes 5 to 40 minutes)");
+    }
+    const DAY: u64 = 86_400_000;
+    let env = Env::new(w, "t12", Cfg { agents: 1, org: 250_000, ..Cfg::default() }).await?;
+    let ts = |h: near_workspaces::types::CryptoHash| async move { w.view_block().block_hash(h).await.map(|b| b.timestamp() / 1_000_000) };
+    expect_status!(env.pay(1, &pid("t12", 0), env.m1.id(), 100_000).await?, "paid");
+    expect_status!(env.pay(1, &pid("t12", 1), env.m1.id(), 100_000).await?, "paid");
+    env.owner.call(&env.ft, "set_delay_hops").args_json(json!({"hops": 20})).transact().await?.into_result()?;
+    let day_d = env.now_ms().await? / DAY;
+    let midnight = (day_d + 1) * DAY;
+    let t0 = Instant::now();
+    loop {
+        let rem = midnight.saturating_sub(env.now_ms().await?);
+        if rem <= 4_000 { break; }
+        w.fast_forward(((rem - 2_500) / 300).max(1)).await?;
+    }
+    let ff_s = t0.elapsed().as_secs();
+    let id = pid("t12", 10);
+    let st = env.agent(1).acct.call(&env.vault, "pay")
+        .args_json(json!({"payment_id": id, "merchant": env.m1.id(), "amount": "50000", "deadline_ms": env.now_ms().await? + 600_000}))
+        .gas(Gas::from_tgas(300)).transact_async().await?;
+    let r = st.await?;
+    let pay_ms = ts(r.outcomes()[1].block_hash).await?;
+    let settle = r.outcomes().iter().find(|o| o.logs.iter().any(|l| l.contains("\"payment_paid\""))).map(|o| o.block_hash).ok_or_else(|| anyhow!("no payment_paid"))?;
+    let settle_ms = ts(settle).await?;
+    ensure!(r.json::<Value>()?["status"] == "paid", "P1 not paid");
+    ensure!(pay_ms / DAY == day_d && settle_ms / DAY == day_d + 1, "P1 did not straddle midnight: reserved {pay_ms}, settled {settle_ms}, midnight {midnight}");
+    let s = env.state().await?;
+    let a = Env::agent_state(&s, 1);
+    ensure!(a["spent_today"] == "50000" && a["reserved"] == "0", "P1 not committed to d+1: {a}");
+    ensure!(s["org"]["spent_today"] == "50000", "org not committed to d+1");
+    env.owner.call(&env.ft, "set_delay_hops").args_json(json!({"hops": 0})).transact().await?.into_result()?;
+    expect_status!(env.pay(1, &pid("t12", 11), env.m1.id(), 100_000).await?, "paid");
+    expect_status!(env.pay(1, &pid("t12", 12), env.m1.id(), 100_000).await?, "paid");
+    expect_status!(env.pay(1, &pid("t12", 13), env.m1.id(), 1_000).await?, "rejected:over_agent_daily_limit");
+    let s = env.state().await?;
+    ensure!(Env::agent_state(&s, 1)["spent_today"] == "250000" && s["org"]["spent_today"] == "250000", "day d+1 settled total != limit");
+    env.check(true).await?;
+    Ok(format!("forwarded {ff_s} s real; P1 reserved {} ms before midnight (day d spent 200000 + 50000 reserved = limit), settled {} ms after it and committed to d+1; d+1 settled total 250000 == limit; next pay over_agent_daily_limit", midnight - pay_ms, settle_ms - midnight))
+}
+
 // ---------- runner ----------
 
 struct Row {
@@ -1128,6 +1253,9 @@ async fn harness() -> Result<()> {
         ("T-52", "I6 I11 rotate", |w| Box::pin(t52(w))),
         ("T-39", "I9 ring", |w| Box::pin(t39(w))),
         ("T-18/T-34", "I3 I5 in-flight", |w| Box::pin(t18_t34(w))),
+        ("T-35b", "I6 upgrade revert", |w| Box::pin(t35b(w))),
+        ("T-50/T-51", "liveness storage", |w| Box::pin(t50_t51(w))),
+        ("T-12", "I1 I2 midnight", |w| Box::pin(t12_sandbox(w))),
     ];
     let mut rows = vec![];
     for (id, inv, f) in scenarios {
@@ -1141,19 +1269,21 @@ async fn harness() -> Result<()> {
         let ms = t.elapsed().as_millis();
         let (status, detail) = match res {
             Ok(d) => ("PASS", d),
+            Err(e) if e.to_string().starts_with("SKIP") => ("SKIP", e.to_string()),
             Err(e) => ("FAIL", format!("{e:#}")),
         };
         println!("[{status}] {id} ({ms} ms): {detail}");
         rows.push(Row { id, inv, status, ms, detail });
     }
     let pass = rows.iter().filter(|r| r.status == "PASS").count();
-    let fail = rows.len() - pass;
+    let skip = rows.iter().filter(|r| r.status == "SKIP").count();
+    let fail = rows.len() - pass - skip;
     println!("\n==================== ORBIT SANDBOX HARNESS ====================");
     println!("{:<16} {:<14} {:<5} {:>7}  evidence", "test", "invariants", "", "ms");
     for r in &rows {
         println!("{:<16} {:<14} {:<5} {:>7}  {}", r.id, r.inv, r.status, r.ms, r.detail);
     }
-    println!("VERDICT: PASS {pass}, FAIL {fail} (post-condition helper P1..P8 after every scenario)");
+    println!("VERDICT: PASS {pass}, FAIL {fail}, SKIP {skip} (post-condition helper P1..P8 after every scenario)");
     println!("===============================================================\n");
     let out = format!("{}/../../harness/out", env!("CARGO_MANIFEST_DIR"));
     let _ = std::fs::create_dir_all(&out);
@@ -1163,7 +1293,7 @@ async fn harness() -> Result<()> {
         .collect();
     let _ = std::fs::write(
         format!("{out}/sandbox.json"),
-        serde_json::to_string_pretty(&json!({"layer": "S", "pass": pass, "fail": fail, "tests": json_rows}))?,
+        serde_json::to_string_pretty(&json!({"layer": "S", "pass": pass, "fail": fail, "skip": skip, "tests": json_rows}))?,
     );
     ensure!(fail == 0, "{fail} sandbox scenario(s) failed");
     Ok(())

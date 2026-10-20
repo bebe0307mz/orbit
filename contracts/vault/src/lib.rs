@@ -917,6 +917,8 @@ impl Vault {
     #[private]
     #[init(ignore_state)]
     pub fn migrate(code_hash: Option<String>) -> Self {
+        #[cfg(feature = "test-migrate-panic")]
+        fail("E_STATE", "test build: migrate always fails");
         let this: Self = env::state_read().unwrap_or_else(|| fail("E_STATE", "no state"));
         emit("upgraded", json!({"code_hash": code_hash, "version": VERSION}));
         this
