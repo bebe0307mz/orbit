@@ -1,0 +1,27 @@
+{
+  "name": "@orbit/cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "orbit-cli: owner and setup commands for the Orbit vault (founder machine only)",
+  "bin": {
+    "orbit-cli": "./src/main.ts"
+  },
+  "scripts": {
+    "cli": "node --experimental-strip-types --no-warnings=ExperimentalWarning src/main.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@orbit/agent": "workspace:*",
+    "@near-js/crypto": "2.5.1",
+    "@near-js/transactions": "2.5.1",
+    "@near-js/utils": "2.5.1",
+    "@orbit/vault-types": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.8"
+  }
+}
