@@ -1,9 +1,9 @@
 // Testnet run of the attack script (skipped unless ORBIT_TESTNET=1). Env as in src/main.ts plus ORBIT_ATTACK_AGENT.
 import { join } from 'node:path';
 import { homedir } from 'node:os';
-import { describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
 import { NearRpc } from '@orbit/agent';
-import { attack, burst, type AttackConfig } from '../src/main.ts';
+import { attack, burst, ProofRecorder, type AttackConfig } from '../src/main.ts';
 
 const live = process.env.ORBIT_TESTNET === '1';
 const e = (k: string) => process.env[k] ?? '';
@@ -13,8 +13,11 @@ describe.skipIf(!live)('testnet attack', () => {
     vault: e('VAULT_ACCOUNT_ID'), merchant: e('MERCHANT_ACCOUNT_ID'), unlisted: e('UNLISTED_ACCOUNT_ID'),
     rpc: new NearRpc(e('NEAR_RPC_URL').split(',')), network: 'testnet',
     keyDir: e('ORBIT_KEY_DIR') || join(homedir(), '.near-credentials', 'orbit-testnet', e('VAULT_ACCOUNT_ID')),
-    owner: e('OWNER_ACCOUNT_ID'), apiUrl: null, out: (s) => console.log(s),
+    owner: e('OWNER_ACCOUNT_ID'), apiUrl: null, out: (s) => console.log(s), proof: new ProofRecorder(),
   };
+  afterAll(async () => {
+    await cfg.proof!.write(cfg, 'Attack proof: rejections, rebroadcast and 20-payment burst (vitest, demo/attack)');
+  }, 60_000);
 
   it('three on-chain rejections and a refused rebroadcast (T-02, T-06, T-07, T-16)', async () => {
     const r = await attack(cfg, e('ORBIT_ATTACK_AGENT') || 'agent-2');

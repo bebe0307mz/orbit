@@ -8,7 +8,9 @@
 // Env: VAULT_ACCOUNT_ID, OWNER_ACCOUNT_ID (burst registration), MERCHANT_ACCOUNT_ID, UNLISTED_ACCOUNT_ID, NEAR_RPC_URL,
 // ORBIT_KEY_DIR (agent key files <name>.json), API_URL (optional, tx-hash reports), ORBIT_NETWORK (default testnet).
 import { createHash, randomBytes } from 'node:crypto';
-import { join } from 'node:path';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { homedir } from 'node:os';
 import type { KeyPair } from '@near-js/crypto';
 import { actionCreators, createTransaction, encodeTransaction, Signature, SignedTransaction } from '@near-js/transactions';
@@ -32,6 +34,38 @@ export interface AttackConfig {
   owner: string | null;
   apiUrl: string | null;
   out: (s: string) => void;
+  /** Collects tx rows and checks for harness/out/testnet-attack-<utc>/ (read by the harness report). */
+  proof?: ProofRecorder;
+}
+
+/** Proof summary in the format Builder B's harness reads: summary.json {title, vault, block_height, counts, checks} + txs.tsv. */
+export class ProofRecorder {
+  readonly rows: [string, string, string][] = [];
+  readonly checks: { check: string; ok: boolean; detail: string }[] = [];
+  tx(step: string, o: PayOutcome | { tx_hash: string | null; text: string }): void {
+    if (!o.tx_hash) return;
+    const result = 'text' in o ? o.text : JSON.stringify({ status: o.status, reason: o.reason, seq: o.seq });
+    this.rows.push([step.replace(/\t/g, ' '), o.tx_hash, result]);
+  }
+  check(name: string, ok: boolean, detail: string): void {
+    this.checks.push({ check: name, ok, detail });
+  }
+  async write(cfg: AttackConfig, title: string, dir?: string): Promise<string> {
+    const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z');
+    const out = dir ?? resolve(dirname(fileURLToPath(import.meta.url)), `../../../harness/out/testnet-attack-${stamp}`);
+    mkdirSync(out, { recursive: true });
+    const s = await cfg.rpc.view<{ block_height: number; counts: unknown; deposited_total: string; available: string; reserved: string; paid_total: string; withdrawn_total: string }>(cfg.vault, 'state');
+    const n = BigInt;
+    this.check('vault conservation (I7) after the run', n(s.deposited_total) === n(s.available) + n(s.reserved) + n(s.paid_total) + n(s.withdrawn_total), `${s.deposited_total} = ${s.available}+${s.reserved}+${s.paid_total}+${s.withdrawn_total}`);
+    const explorer = cfg.network === 'mainnet' ? 'https://nearblocks.io/txns' : 'https://testnet.nearblocks.io/txns';
+    writeFileSync(join(out, 'txs.tsv'), this.rows.map((r) => r.join('\t')).join('\n') + '\n');
+    writeFileSync(join(out, 'summary.json'), JSON.stringify({
+      title, network: cfg.network, vault: cfg.vault, block_height: s.block_height, counts: s.counts, checks: this.checks,
+      txs: this.rows.map(([step, tx, result]) => ({ step, tx, link: `${explorer}/${tx}`, result })),
+    }, null, 2) + '\n');
+    cfg.out(`proof written: ${out}`);
+    return out;
+  }
 }
 
 const pid = () => randomBytes(32).toString('hex');
@@ -39,7 +73,7 @@ const usd = (base: number) => `$${(base / 1e6).toFixed(2)}`;
 
 function line(cfg: AttackConfig, label: string, o: PayOutcome): void {
   const link = o.tx_hash ? ` ${cfg.network === 'mainnet' ? 'https://nearblocks.io/txns' : 'https://testnet.nearblocks.io/txns'}/${o.tx_hash}` : '';
-  cfg.out(`${label.padEnd(44)} ${o.status}${o.reason ? ' ' + o.reason : ''}${o.seq != null ? ' seq ' + o.seq : ''}${link}`);
+  cfg.out(`${label.padEnd(44)} ${o.status}${o.reason ? ' ' + o.reason : ''}${o.seq != null ? ' seq ' + o.seq : ''}${link}${o.error && o.status !== 'paid' && o.status !== 'rejected' ? ' (' + o.error.slice(0, 160) + ')' : ''}`);
 }
 
 function agentFor(cfg: AttackConfig, name: string, maxInFlight = 4): OrbitAgent {
@@ -80,15 +114,20 @@ export async function attack(cfg: AttackConfig, name: string): Promise<Record<st
   const a = await agent.pay({ payment_id: pid(), merchant: cfg.merchant, amount: '500000', deadline_ms: deadline() });
   line(cfg, `1. pay ${usd(500000)} (over its per-payment limit)`, a);
   results.over_limit = `${a.status}:${a.reason}`;
+  cfg.proof?.tx(`1. ${name} pays $0.50 (per-payment limit)`, a);
+  cfg.proof?.check('over per-payment limit rejected on chain', a.status === 'rejected' && a.reason === 'over_per_payment_limit', `${a.status} ${a.reason ?? ''}`);
 
   const b = await agent.pay({ payment_id: pid(), merchant: cfg.unlisted, amount: '10000', deadline_ms: deadline() });
   line(cfg, `2. pay ${cfg.unlisted} (not allowlisted)`, b);
   results.unlisted = `${b.status}:${b.reason}`;
+  cfg.proof?.tx(`2. ${name} pays unlisted merchant`, b);
+  cfg.proof?.check('unlisted merchant rejected on chain', b.status === 'rejected' && b.reason === 'merchant_not_allowed', `${b.status} ${b.reason ?? ''}`);
 
   let replayId = await lastPaidId(cfg, agent.publicKey);
   if (!replayId) {
     const seed = await agent.pay({ payment_id: pid(), merchant: cfg.merchant, amount: '1000', deadline_ms: deadline() });
     line(cfg, '   (setup: one honest $0.001 payment to replay)', seed);
+    cfg.proof?.tx('setup: honest $0.001 payment to replay', seed);
     if (seed.status !== 'paid') throw new Error('could not create a paid payment to replay');
     replayId = seed.payment_id;
   }
@@ -102,6 +141,8 @@ export async function attack(cfg: AttackConfig, name: string): Promise<Record<st
       : { status: 'not_executed', reason: 'panic' in parsed ? parsed.panic : null, payment_id: replayId, seq: null, tx_hash: signed.hash, error: null };
   line(cfg, `3. replay paid payment_id ${replayId.slice(0, 8)}...`, replay);
   results.replay = `${replay.status}:${replay.reason}`;
+  cfg.proof?.tx(`3. ${name} replays paid payment_id`, replay);
+  cfg.proof?.check('replayed payment_id rejected on chain', replay.status === 'rejected' && replay.reason === 'duplicate_payment', `${replay.status} ${replay.reason ?? ''}`);
   if (cfg.apiUrl) {
     await fetch(new URL('/v1/tx-reports', cfg.apiUrl), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ payment_id: replayId, tx_hash: signed.hash }) }).catch(() => undefined);
   }
@@ -119,12 +160,15 @@ export async function attack(cfg: AttackConfig, name: string): Promise<Record<st
   const unchanged = JSON.stringify(before.counts) === JSON.stringify(after.counts);
   cfg.out(`${'4. rebroadcast identical signed tx 3'.padEnd(44)} ${rb}; vault counters ${unchanged ? 'unchanged' : 'CHANGED'}`);
   results.rebroadcast = unchanged ? 'not_executed_twice' : 'CHANGED';
+  cfg.proof?.tx('4. rebroadcast identical signed tx 3', { tx_hash: signed.hash, text: rb });
+  cfg.proof?.check('identical signed tx never executes twice', unchanged, rb);
   return results;
 }
 
 export async function once(cfg: AttackConfig, name: string): Promise<PayOutcome> {
   const o = await agentFor(cfg, name).pay({ payment_id: pid(), merchant: cfg.merchant, amount: '10000', deadline_ms: Date.now() + 120_000 });
   line(cfg, `pay ${usd(10000)} to ${cfg.merchant}`, o);
+  cfg.proof?.tx(`${name} pays $0.01`, o);
   return o;
 }
 
@@ -150,12 +194,17 @@ export async function burst(cfg: AttackConfig, opts: { count?: number; amount?: 
   let other = 0;
   outs.forEach((o, i) => {
     line(cfg, `  #${String(i + 1).padStart(2)}`, o);
+    cfg.proof?.tx(`burst ${name} #${i + 1} $0.05`, o);
     if (o.status === 'paid') paid++;
     else if (o.status === 'rejected' && o.reason) reasons[o.reason] = (reasons[o.reason] ?? 0) + 1;
     else other++;
   });
   const summary = Object.entries(reasons).map(([r, n]) => `${n} ${r}`).join(', ');
   cfg.out(`burst result: ${paid} paid, ${summary || '0 rejected'}${other ? `, ${other} other` : ''}`);
+  const a = (await cfg.rpc.view<{ agents: { id: number; spent_today: string; reserved: string }[] }>(cfg.vault, 'state')).agents.find((x) => x.id === Number(reg.value));
+  cfg.proof?.check(`burst: exactly ${daily / amount} of ${count} paid`, paid === daily / amount, `${paid} paid`);
+  cfg.proof?.check(`burst: ${count - daily / amount} rejected over_agent_daily_limit`, reasons.over_agent_daily_limit === count - daily / amount && other === 0, summary);
+  cfg.proof?.check('burst agent spent_today equals its daily limit', a?.spent_today === String(daily) && a?.reserved === '0', `spent ${a?.spent_today} reserved ${a?.reserved}`);
   return { paid, reasons, other };
 }
 
@@ -176,12 +225,14 @@ async function main(argv: string[]): Promise<number> {
     owner: process.env.OWNER_ACCOUNT_ID ?? null,
     apiUrl: process.env.API_URL || null,
     out: (s) => console.log(s),
+    proof: process.env.ORBIT_NO_PROOF === '1' ? undefined : new ProofRecorder(),
   };
   const flag = (n: string) => argv.includes(`--${n}`);
   const agentName = argv[argv.indexOf('--agent') + 1];
   try {
     if (flag('burst')) {
       const r = await burst(cfg);
+      await cfg.proof?.write(cfg, 'Attack proof: 20-payment burst (demo/attack --burst)');
       return r.paid === 5 && r.reasons.over_agent_daily_limit === 15 ? 0 : 1;
     }
     if (!flag('agent') || !agentName || !/^[a-z0-9-]{1,32}$/.test(agentName)) {
@@ -190,9 +241,11 @@ async function main(argv: string[]): Promise<number> {
     }
     if (flag('once')) {
       await once(cfg, agentName);
+      await cfg.proof?.write(cfg, `Attack proof: ${agentName} --once`);
       return 0;
     }
     await attack(cfg, agentName);
+    await cfg.proof?.write(cfg, `Attack proof: ${agentName} rejections and rebroadcast (demo/attack)`);
     return 0;
   } catch (e) {
     console.error(`error: ${(e as Error).message}`);

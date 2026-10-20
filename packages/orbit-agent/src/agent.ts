@@ -290,11 +290,11 @@ export class OrbitAgent {
   private signAndSend(req: PayRequest & { amount: string }): Promise<{ hash: string } | { code: string; message: string; hash?: string }> {
     return this.withNonceLock(async () => {
       if (this.nonce == null) {
-        const ak = await this.rpc.viewAccessKey(this.vault, this.publicKey);
+        const ak = await this.retry(() => this.rpc.viewAccessKey(this.vault, this.publicKey));
         this.nonce = BigInt(ak.nonce);
       }
       const nonce = this.nonce + 1n;
-      const block = await this.rpc.finalBlock();
+      const block = await this.retry(() => this.rpc.finalBlock());
       const args = { payment_id: req.payment_id, merchant: req.merchant, amount: req.amount, deadline_ms: req.deadline_ms };
       const tx = createTransaction(this.vault, this.kp.getPublicKey(), this.vault, nonce, [actionCreators.functionCall('pay', args, PAY_GAS, 0n)], baseDecode(block.hash));
       const digest = new Uint8Array(createHash('sha256').update(encodeTransaction(tx)).digest());
@@ -311,6 +311,18 @@ export class OrbitAgent {
         return { code, message: (e as Error).message, hash };
       }
     });
+  }
+
+  /** Pre-send reads only (nothing signed yet): retried, since a public RPC may rate-limit a burst. */
+  private async retry<T>(f: () => Promise<T>, tries = 4): Promise<T> {
+    for (let i = 0; ; i++) {
+      try {
+        return await f();
+      } catch (e) {
+        if (i + 1 >= tries) throw e;
+        await this.sleep(500 * 2 ** i);
+      }
+    }
   }
 
   private withNonceLock<T>(f: () => Promise<T>): Promise<T> {
