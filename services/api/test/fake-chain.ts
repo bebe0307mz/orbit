@@ -202,6 +202,10 @@ export class FakeChain {
   /** Serve over HTTP (UI harness). */
   listen(port = 0): Promise<{ server: Server; url: string }> {
     const server = createServer(async (req, res) => {
+      // public NEAR RPC endpoints allow browser calls; so does the fake (dashboard rpc mode)
+      res.setHeader('access-control-allow-origin', '*');
+      res.setHeader('access-control-allow-headers', 'content-type');
+      if (req.method === 'OPTIONS') return res.end();
       const chunks: Buffer[] = [];
       for await (const c of req) chunks.push(c as Buffer);
       if (this.down) {

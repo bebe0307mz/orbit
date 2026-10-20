@@ -7,8 +7,11 @@
   },
   "scripts": {
     "dev": "pnpm --filter @orbit/dashboard dev",
+    "api": "pnpm --filter @orbit/api start",
     "test": "pnpm -r --if-present test",
-    "check:ui": "node harness/ui/check-ui.mjs",
+    "check:ui": "node harness/ui/check-ui.mjs && node harness/ui/check-live.mjs",
+    "check:ui:mock": "node harness/ui/check-ui.mjs",
+    "check:ui:live": "node harness/ui/check-live.mjs",
     "check:contrast": "node harness/ui/contrast.mjs"
   }
 }

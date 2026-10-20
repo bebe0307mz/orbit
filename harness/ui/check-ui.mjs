@@ -4,133 +4,17 @@
 // theme persistence, the detail panel, the pause flows, add agent, viewer mode and every spec state.
 // Screenshots go to harness/out/ui/ (gitignored). Exit 1 on any failure.
 import { spawn, execSync } from 'node:child_process';
-import { createRequire } from 'node:module';
-import { mkdirSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
 import contrast from './contrast.mjs';
+import {
+  OUT, EXE, chromium, root, results, ok, group, checkFigures, noHScroll, copyRules, open, close, shot, text, waitText, use, finish,
+} from './lib.mjs';
 
-const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
-const OUT = join(root, 'harness/out/ui');
-mkdirSync(OUT, { recursive: true });
-const require = createRequire(import.meta.url);
-const PW_CORE = process.env.PLAYWRIGHT_CORE || '/Users/bibi/.openclaw/workspace/resume-roaster/node_modules/playwright-core';
-const EXE = process.env.CHROME_PATH || process.env.HOME + '/Library/Caches/ms-playwright/chromium_headless_shell-1243/chrome-headless-shell-mac-arm64/chrome-headless-shell';
-const { chromium } = require(PW_CORE);
 const PORT = Number(process.env.UI_PORT || 4317);
 const BASE = `http://127.0.0.1:${PORT}/`;
 const WIDTHS = [1440, 1024, 768, 390];
 const THEMES = ['dark', 'light'];
-
-/* ---------- results ---------- */
-const results = [];
-let current = '';
-function ok(cond, msg) {
-  results.push({ group: current, msg, pass: !!cond });
-  if (!cond) console.log(`  FAIL ${current}: ${msg}`);
-  return !!cond;
-}
-
-/* ---------- independent formulas (2-lld 8), plain BigInt ---------- */
-const big = (x) => BigInt(x);
-function fmtUsd(base) {
-  let v = big(base); const neg = v < 0n; if (neg) v = -v;
-  const whole = v / 1000000n, frac = (v % 1000000n).toString().padStart(6, '0');
-  let f = frac.replace(/0+$/, ''); if (f.length < 2) f = frac.slice(0, 2);
-  return (neg ? '-$' : '$') + whole.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',') + '.' + f;
-}
-const fmtInt = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-const min = (...xs) => xs.reduce((m, x) => (x < m ? x : m));
-const max0 = (x) => (x < 0n ? 0n : x);
-const dayOf = (ms) => Math.floor(ms / 86400000);
-
-function expected(s, outcomes) {
-  const A = big(s.vault.available), R = big(s.vault.reserved);
-  const orgRaw = big(s.org.daily_limit) - big(s.org.spent_today) - big(s.org.reserved);
-  const want = {
-    'vault.balance': fmtUsd(A + R), 'vault.cap': fmtUsd(s.vault.float_cap), 'vault.available': fmtUsd(A),
-    'org.spent': fmtUsd(s.org.spent_today), 'org.limit': fmtUsd(s.org.daily_limit),
-    'org.remaining': s.org.paused ? 'Org paused' : fmtUsd(max0(min(orgRaw, A))),
-    'org.left': fmtUsd(max0(orgRaw)) + ' left',
-    'inflight': fmtUsd(s.org.reserved), 'inflight.n': String(s.pending_count), 'agents.spent': fmtUsd(s.org.spent_today),
-    'count.all': fmtInt(s.counts.next_seq + s.pending_count), 'count.paid': fmtInt(s.counts.paid), 'count.rejected': fmtInt(s.counts.rejected),
-    'count.failed': fmtInt(s.counts.failed), 'count.pending': fmtInt(s.pending_count), 'count.outcomes': fmtInt(s.counts.next_seq),
-  };
-  for (const a of s.agents) {
-    const k = `agent.${a.id}.`;
-    const own = big(a.daily_limit) - big(a.spent_today) - big(a.reserved);
-    const rem = a.status !== 'active' || s.org.paused ? 0n : max0(min(own, orgRaw, A));
-    want[k + 'remaining'] = fmtUsd(rem);
-    want[k + 'spent'] = fmtUsd(a.spent_today); want[k + 'reserved'] = fmtUsd(a.reserved);
-    want[k + 'daily'] = fmtUsd(a.daily_limit); want[k + 'per'] = fmtUsd(a.per_payment_limit);
-    want[k + 'paid'] = String(a.paid_count); want[k + 'rejected'] = String(a.rejected_count); want[k + 'failed'] = String(a.failed_count);
-  }
-  // snapshot vs history: spent today is the paid outcomes settled today; counts match the ring
-  const hist = [];
-  if (outcomes.length === s.counts.next_seq && outcomes.every((o, i) => o.seq === i)) {
-    const today = dayOf(s.snapshot.timestamp_ms);
-    const paidToday = outcomes.filter((o) => o.kind === 'paid' && dayOf(o.timestamp_ms) === today);
-    const sum = (l) => l.reduce((t, o) => t + big(o.amount), 0n);
-    hist.push(['org.spent_today = paid outcomes today', s.org.spent_today, sum(paidToday).toString()]);
-    hist.push(['paid_total = all paid outcomes', s.vault.paid_total, sum(outcomes.filter((o) => o.kind === 'paid')).toString()]);
-    for (const a of s.agents) {
-      hist.push([`${a.name} spent_today = its paid outcomes today`, a.spent_today, sum(paidToday.filter((o) => o.agent_id === a.id)).toString()]);
-      hist.push([`${a.name} paid_count`, String(a.paid_count), String(outcomes.filter((o) => o.agent_id === a.id && o.kind === 'paid').length)]);
-    }
-    hist.push(['I7 conservation', s.vault.deposited_total, (A + R + big(s.vault.paid_total) + big(s.vault.withdrawn_total)).toString()]);
-    hist.push(['I9 next_seq', String(s.counts.next_seq), String(s.counts.paid + s.counts.failed + s.counts.rejected)]);
-  }
-  return { want, hist };
-}
-
-async function checkFigures(page, label) {
-  const dbg = await page.evaluate(() => window.__ORBIT_DEBUG__);
-  if (!ok(dbg && dbg.state, `${label}: debug snapshot present`)) return;
-  const shown = await page.$$eval('[data-check]', (els) => els.filter((e) => e.offsetParent !== null || e.getClientRects().length).map((e) => [e.getAttribute('data-check'), e.textContent.trim()]));
-  const { want, hist } = expected(dbg.state, dbg.outcomes);
-  let n = 0;
-  for (const [k, v] of shown) {
-    n++;
-    if (!(k in want)) ok(false, `${label}: [data-check=${k}] has no formula`);
-    else if (v !== want[k]) ok(false, `${label}: ${k} shows ${v}, formula gives ${want[k]}`);
-  }
-  ok(n > 0, `${label}: ${n} figures equal their formulas`);
-  for (const [name, a, b] of hist) ok(a === b, `${label}: ${name} (${a} vs ${b})`);
-}
-
-async function noHScroll(page, label) {
-  const [sw, iw] = await page.evaluate(() => [document.documentElement.scrollWidth, window.innerWidth]);
-  ok(sw <= iw, `${label}: no horizontal scroll (scrollWidth ${sw}, viewport ${iw})`);
-}
-
-const BANNED = [/\u2014/, /\u2013/, /\bsafe\b/i, /\bprotected\b/i, /\bfunds\b/i];
-async function copyRules(page, label) {
-  const text = await page.evaluate(() => document.body.innerText);
-  for (const re of BANNED) ok(!re.test(text), `${label}: rendered copy has no ${re}`);
-  ok(!/\bNaN\b|undefined|\[object/.test(text), `${label}: no NaN, undefined or [object] in rendered text`);
-}
-
-/* ---------- browser plumbing ---------- */
 let browser;
-async function open({ width = 1440, theme = 'dark', query = '', hash = '#/agents', height = 900, init = true } = {}) {
-  const ctx = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 1, reducedMotion: 'reduce' });
-  if (init) await ctx.addInitScript((t) => { try { if (!sessionStorage.getItem('orbit.init')) { localStorage.setItem('orbit.theme', t); sessionStorage.setItem('orbit.init', '1'); } } catch (e) {} }, theme);
-  const page = await ctx.newPage();
-  const errors = [];
-  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
-  page.on('pageerror', (e) => errors.push(String(e)));
-  await page.goto(BASE + (query ? '?' + query : '') + hash);
-  return { ctx, page, errors };
-}
-const shot = (page, name) => page.screenshot({ path: join(OUT, name + '.png') });
-const text = async (page, sel) => (await page.locator(sel).first().innerText()).replace(/\s+/g, ' ').trim();
-async function close(o, label) {
-  ok(o.errors.length === 0, `${label}: zero console errors${o.errors.length ? ' (' + o.errors.slice(0, 3).join(' | ') + ')' : ''}`);
-  await o.ctx.close();
-}
-async function waitText(page, sel, re, timeout = 15000) {
-  await page.waitForFunction(([s, src]) => { const el = document.querySelector(s); return !!el && new RegExp(src).test(el.textContent); }, [sel, re.source], { timeout });
-}
 
 /* ---------- server ---------- */
 async function startServer() {
@@ -148,7 +32,7 @@ async function startServer() {
 /* ---------- checks ---------- */
 async function matrix() {
   for (const theme of THEMES) for (const width of WIDTHS) {
-    current = `matrix ${theme} ${width}`;
+    group(`matrix ${theme} ${width}`);
     // Agents
     let o = await open({ width, theme });
     await o.page.waitForSelector('[data-check="vault.balance"]');
@@ -186,7 +70,7 @@ async function matrix() {
 }
 
 async function themePersistence() {
-  current = 'theme';
+  group('theme');
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const page = await ctx.newPage();
   const errors = [];
@@ -218,7 +102,7 @@ async function themePersistence() {
 }
 
 async function panelFlow() {
-  current = 'panel';
+  group('panel');
   let o = await open({ hash: '#/agents?agent=2' });
   await o.page.waitForSelector('#panel');
   ok(/research-scout/.test(await text(o.page, '#panel .name')), 'deep link ?agent=2 opens research-scout');
@@ -254,7 +138,7 @@ async function panelFlow() {
 }
 
 async function pauseFlow() {
-  current = 'pause';
+  group('pause');
   const o = await open({});
   const p = o.page;
   await p.waitForSelector('tr.row[data-id="4"]');
@@ -286,7 +170,7 @@ async function pauseFlow() {
 }
 
 async function pauseFailFlow() {
-  current = 'pause fails';
+  group('pause fails');
   const o = await open({ query: 'fail=pause', hash: '#/agents?agent=4' });
   const p = o.page;
   await p.waitForSelector('#panel [data-pause]');
@@ -305,7 +189,7 @@ async function pauseFailFlow() {
 }
 
 async function pauseAllFlow() {
-  current = 'pause all';
+  group('pause all');
   const o = await open({});
   const p = o.page;
   await p.click('#pauseAll');
@@ -324,7 +208,7 @@ async function pauseAllFlow() {
 }
 
 async function unresolvedFlow() {
-  current = 'unresolved';
+  group('unresolved');
   const o = await open({ query: 'fail=unresolved', hash: '#/agents?agent=3' });
   await o.page.click('#panel [data-pause]');
   await o.page.click('#dlg [data-go]');
@@ -334,7 +218,7 @@ async function unresolvedFlow() {
 }
 
 async function viewerFlow() {
-  current = 'viewer';
+  group('viewer');
   const o = await open({ query: 'viewer=1', hash: '#/agents?agent=2' });
   const p = o.page;
   await p.waitForSelector('#panel');
@@ -346,7 +230,7 @@ async function viewerFlow() {
 }
 
 async function addAgentFlow() {
-  current = 'add agent';
+  group('add agent');
   const o = await open({});
   const p = o.page;
   await p.click('#addAgent');
@@ -379,7 +263,7 @@ async function addAgentFlow() {
 }
 
 async function statesFlow() {
-  current = 'states';
+  group('states');
   for (const theme of THEMES) {
     let o = await open({ theme, query: 'state=loading' });
     await o.page.waitForSelector('[data-testid="skeleton"]');
@@ -436,7 +320,7 @@ async function statesFlow() {
 }
 
 async function activityFlow() {
-  current = 'activity';
+  group('activity');
   const o = await open({ hash: '#/activity?status=rejected&agent=6' });
   const p = o.page;
   await p.waitForSelector('tr.row');
@@ -465,22 +349,20 @@ async function activityFlow() {
 
 /* ---------- run ---------- */
 const server = await startServer();
-let code = 0;
 try {
   browser = await chromium.launch({ executablePath: EXE });
+  use(browser, BASE);
   for (const [name, fn] of [['matrix', matrix], ['theme', themePersistence], ['panel', panelFlow], ['pause', pauseFlow], ['pause fails', pauseFailFlow], ['pause all', pauseAllFlow], ['unresolved', unresolvedFlow], ['viewer', viewerFlow], ['add agent', addAgentFlow], ['states', statesFlow], ['activity', activityFlow]]) {
     console.log(`- ${name}`);
-    try { await fn(); } catch (e) { current = name; ok(false, `threw: ${e.message.split('\n')[0]}`); }
+    try { await fn(); } catch (e) { group(name); ok(false, `threw: ${e.message.split('\n')[0]}`); }
   }
 } finally {
   await browser?.close();
   server.kill();
 }
-current = 'contrast';
+group('contrast');
 for (const f of contrast.failures) ok(false, f);
 ok(contrast.failures.length === 0, `contrast: ${Object.values(contrast.themes).flat().length} token pairs meet WCAG AA`);
-const failed = results.filter((r) => !r.pass);
-writeFileSync(join(OUT, 'report.json'), JSON.stringify({ at: new Date().toISOString(), passed: results.length - failed.length, failed: failed.length, results, contrast: contrast.themes }, null, 2));
-console.log(`\nui check: ${results.length - failed.length} passed, ${failed.length} failed. Screenshots and report.json in harness/out/ui/`);
-if (failed.length) code = 1;
+const code = finish('report.json', { contrast: contrast.themes });
+console.log(`\nui check (mock): ${results.filter((r) => r.pass).length} passed, ${results.filter((r) => !r.pass).length} failed. Screenshots and report.json in harness/out/ui/`);
 process.exit(code);
