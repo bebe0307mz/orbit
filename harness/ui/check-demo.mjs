@@ -10,7 +10,7 @@ import { join } from 'node:path';
 import { EXE, OUT, chromium, root, results, ok, group, checkFigures, noHScroll, open, close, shot, text, use, finish, decimalSpread, figureLefts, AMOUNT_COLUMNS } from './lib.mjs';
 
 const VAULT = process.env.VAULT_ACCOUNT_ID || 'orbit-vault-fkuc.testnet';
-const RPC = process.env.NEAR_RPC_URL || 'https://test.rpc.fastnear.com,https://rpc.testnet.fastnear.com';
+const RPC = process.env.NEAR_RPC_URL || 'https://test.rpc.fastnear.com,https://rpc.testnet.fastnear.com,https://rpc.testnet.near.org';
 const MERCHANT = process.env.MERCHANT_ACCOUNT_ID || 'orbit-merchant-fkuc.testnet';
 const TOKEN = process.env.TOKEN_ACCOUNT_ID || 'orbit-token-fkuc.testnet';
 const KEY_FILE = process.env.GUARDIAN_KEY_FILE || join(homedir(), '.near-credentials/orbit-testnet', VAULT, 'guardian.json');
@@ -72,7 +72,7 @@ if (FLAKY) {
   await new Promise((r) => flakyServer.listen(FLAKY_PORT, '127.0.0.1', r));
 }
 const API_RPC = FLAKY ? `http://127.0.0.1:${FLAKY_PORT}` : RPC.split(',')[0];
-const API_FALLBACK = FLAKY ? (RPC.split(',')[1] ?? 'https://test.rpc.fastnear.com') : (RPC.split(',')[1] ?? '');
+const API_FALLBACK = RPC.split(',').slice(1).join(',');
 
 const password = 'demo-run-' + Math.random().toString(36).slice(2);
 const pwHash = execSync(`node ${NODE_TS.join(' ')} src/cli.ts hash-password`, { cwd: join(root, 'services/api'), input: password }).toString().trim();

@@ -249,6 +249,15 @@ describe('token backing (C2, in-flight safe)', () => {
 });
 
 describe('RPC fallback', () => {
+  it('defaults: fastnear first, the throttling near.org endpoint only as the last fallback; env lists override', () => {
+    const t = loadConfig({ NEAR_NETWORK: 'testnet', VAULT_ACCOUNT: 'v.testnet' });
+    expect([t.rpcUrl, ...t.rpcFallbackUrls]).toEqual(['https://test.rpc.fastnear.com', 'https://rpc.testnet.fastnear.com', 'https://rpc.testnet.near.org']);
+    const m = loadConfig({ NEAR_NETWORK: 'mainnet', VAULT_ACCOUNT: 'v.near' });
+    expect(m.rpcFallbackUrls.at(-1)).toBe('https://rpc.mainnet.near.org');
+    expect(loadConfig({ VAULT_ACCOUNT: 'v', RPC_URL: 'https://a', RPC_FALLBACK_URL: 'https://b, https://c' }).rpcFallbackUrls).toEqual(['https://b', 'https://c']);
+    expect(loadConfig({ VAULT_ACCOUNT: 'v', RPC_URL: 'https://a' }).rpcFallbackUrls).toEqual([]);
+  });
+
   const failing = (chain: FakeChain, methods: RegExp) => (async (url: string, init: RequestInit) => {
     const body = JSON.parse(String(init.body));
     const name = body.method === 'query' ? `query:${body.params.method_name ?? body.params.request_type}` : body.method;

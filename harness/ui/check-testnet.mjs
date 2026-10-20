@@ -83,14 +83,14 @@ const pwHash = execSync(`node ${NODE_TS.join(' ')} src/cli.ts hash-password`, { 
 const distRpc = join(OUT, 'dist-testnet-rpc');
 const distApi = join(OUT, 'dist-testnet-api');
 console.log(`testnet vault ${VAULT} at block ${S0.block_height}; building dashboards`);
-build('rpc', distRpc, { VITE_NETWORK: 'testnet', VITE_NEAR_RPC_URL: `${RPC},${RPC_FALLBACK}`, VITE_VAULT_ACCOUNT_ID: VAULT });
+build('rpc', distRpc, { VITE_NETWORK: 'testnet', VITE_NEAR_RPC_URL: `${RPC},${RPC_FALLBACK},https://rpc.testnet.near.org`, VITE_VAULT_ACCOUNT_ID: VAULT });
 build('api', distApi, { VITE_NETWORK: 'testnet' });
 
 const ORIGIN = `http://127.0.0.1:${API_PORT}`;
 const api = spawn('node', [...NODE_TS, 'src/main.ts'], {
   cwd: API,
   env: {
-    ...process.env, NEAR_NETWORK: 'testnet', VAULT_ACCOUNT: VAULT, RPC_URL: RPC, RPC_FALLBACK_URL: RPC_FALLBACK,
+    ...process.env, NEAR_NETWORK: 'testnet', VAULT_ACCOUNT: VAULT, RPC_URL: RPC, RPC_FALLBACK_URL: `${RPC_FALLBACK},https://rpc.testnet.near.org`,
     DB_PATH: join(tmp, 'orbit-testnet.sqlite'), GUARDIAN_KEY_FILE: KEY_FILE, OPERATOR_PASSWORD_HASH: pwHash,
     SESSION_SECRET: 'testnet-harness-' + Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2),
     PUBLIC_ORIGIN: ORIGIN, PORT: String(API_PORT), HOST: '127.0.0.1', DASHBOARD_DIR: distApi,

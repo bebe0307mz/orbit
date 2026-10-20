@@ -19,7 +19,7 @@ export interface Running {
 
 export async function startApi(config: ApiConfig, opts: { log?: Logger; fetchImpl?: typeof fetch; now?: () => number } = {}): Promise<Running> {
   const log = opts.log ?? jsonLogger();
-  const rpc = new NearRpc(config.rpcUrl, config.rpcFallbackUrl, opts.fetchImpl ?? fetch);
+  const rpc = new NearRpc(config.rpcUrl, config.rpcFallbackUrls, opts.fetchImpl ?? fetch);
   const store = new Store(config.dbPath);
   store.bindNetwork(config.network, config.vaultAccount);
   const syncer = new Syncer(rpc, store, log, { network: config.network, vaultAccount: config.vaultAccount, staleMs: config.staleMs, now: opts.now });

@@ -6,7 +6,8 @@ export interface ApiConfig {
   network: Network;
   vaultAccount: string;
   rpcUrl: string;
-  rpcFallbackUrl: string | null;
+  /** tried in order after rpcUrl */
+  rpcFallbackUrls: string[];
   syncIntervalMs: number;
   /** sync interval while payments are moving */
   syncFastMs: number;
@@ -39,7 +40,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ApiConfig {
     network,
     vaultAccount,
     rpcUrl,
-    rpcFallbackUrl: env.RPC_FALLBACK_URL || env.NEAR_RPC_URL?.split(',')[1] || (env.RPC_URL || env.NEAR_RPC_URL ? null : DEFAULT_RPC[network][1]),
+    rpcFallbackUrls: (env.RPC_FALLBACK_URL ? env.RPC_FALLBACK_URL.split(',') : env.NEAR_RPC_URL ? env.NEAR_RPC_URL.split(',').slice(1) : env.RPC_URL ? [] : DEFAULT_RPC[network].slice(1)).map((x) => x.trim()).filter(Boolean),
     syncIntervalMs: num(env.SYNC_INTERVAL_MS, 3000),
     syncFastMs: num(env.SYNC_FAST_MS, 1000),
     staleMs: num(env.STALE_MS, 15000),

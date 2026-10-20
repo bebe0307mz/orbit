@@ -149,11 +149,12 @@ export const DAY_MS = 86_400_000;
 export const USDC_DECIMALS = 6;
 
 /**
- * Default NEAR RPC endpoints (primary, fallback). rpc.mainnet.near.org and rpc.testnet.near.org are deprecated: since
- * 2026-10-20 they answer every call with a JSON-RPC error -429 "THIS ENDPOINT IS DEPRECATED". Production should
- * set its own (paid) RPC; these are the public defaults.
+ * Default NEAR RPC endpoints, in order: primary, then fallbacks. rpc.mainnet.near.org and rpc.testnet.near.org are
+ * deprecated and throttle intermittently (seen 2026-10-20: a JSON-RPC error -429 "THIS ENDPOINT IS DEPRECATED" on some
+ * calls, normal answers on others), so they are kept only as the last fallback. Production should set its own (paid)
+ * RPC; these are the public defaults.
  */
-export const DEFAULT_RPC: Record<'mainnet' | 'testnet', [string, string]> = {
-  mainnet: ['https://free.rpc.fastnear.com', 'https://rpc.mainnet.fastnear.com'],
-  testnet: ['https://test.rpc.fastnear.com', 'https://rpc.testnet.fastnear.com'],
+export const DEFAULT_RPC: Record<'mainnet' | 'testnet', string[]> = {
+  mainnet: ['https://free.rpc.fastnear.com', 'https://rpc.mainnet.fastnear.com', 'https://rpc.mainnet.near.org'],
+  testnet: ['https://test.rpc.fastnear.com', 'https://rpc.testnet.fastnear.com', 'https://rpc.testnet.near.org'],
 };

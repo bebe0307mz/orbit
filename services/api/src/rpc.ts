@@ -52,8 +52,8 @@ export class NearRpc {
   /** calls answered by a URL other than the first (fallback used), and failures of the first URL */
   readonly stats = { primary_failures: 0, fallback_answers: 0, last_primary_error: null as string | null };
 
-  constructor(url: string, fallback: string | null = null, fetchImpl: typeof fetch = fetch) {
-    this.urls = fallback ? [url, fallback] : [url];
+  constructor(url: string, fallback: string | string[] | null = null, fetchImpl: typeof fetch = fetch) {
+    this.urls = [url, ...(Array.isArray(fallback) ? fallback : fallback ? [fallback] : [])];
     this.fetchImpl = fetchImpl;
   }
 
@@ -91,7 +91,7 @@ export class NearRpc {
       if (body.error) {
         const code = errorCode(body.error);
         const err = new RpcError(code, `NEAR RPC ${code}${typeof body.error.data === 'string' ? ': ' + body.error.data.slice(0, 200) : ''}`, body.error.data ?? body.error.cause);
-        // -429: rate limited, or a deprecated endpoint (rpc.*.near.org answer this to every call). The request was
+        // -429: rate limited, or a deprecated endpoint throttling (rpc.*.near.org send it on some calls). The request was
         // refused, not executed, so even a send may go to the next URL (identical signed bytes, same hash and nonce).
         const refused = body.error.code === -429 || /deprecated|rate limit/i.test(body.error.message ?? '');
         if ((refused || (!write && TRANSIENT.test(code))) && i < this.urls.length - 1) {

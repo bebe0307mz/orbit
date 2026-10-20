@@ -35,7 +35,7 @@ const FAILOVER = /^(INTERNAL_ERROR|TIMEOUT_ERROR|UNKNOWN_BLOCK|NO_SYNCED_BLOCKS|
 
 /**
  * One `call_function` view call. Tries each URL in order: a transport error, HTTP 429/5xx, a JSON-RPC -429 (rate limit
- * or the deprecated near.org endpoints) or a transient server error moves on to the next URL. A view panic is final.
+ * or a deprecated near.org endpoint throttling) or a transient server error moves on to the next URL. A view panic is final.
  */
 export async function viewCall<T>(
   fetchImpl: typeof fetch, rpcUrls: string | string[], accountId: string, method: string, args: object,
