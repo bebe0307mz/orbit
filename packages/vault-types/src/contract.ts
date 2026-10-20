@@ -18,6 +18,7 @@ export const REASON_CODES = [
   'agent_paused',
   'merchant_not_allowed',
   'over_per_payment_limit',
+  'over_agent_daily_count',
   'over_agent_daily_limit',
   'over_org_daily_limit',
   'insufficient_vault_balance',
@@ -64,6 +65,10 @@ export interface AgentView {
   paid_count: number;
   rejected_count: number;
   failed_count: number;
+  /** Accepted (reserved) payments allowed per UTC day (contract default 200). */
+  max_payments_per_day?: number;
+  /** Accepted payments today; at max_payments_per_day the next pay is rejected over_agent_daily_count. */
+  payments_today?: number;
 }
 
 export interface MerchantView {

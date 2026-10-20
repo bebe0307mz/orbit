@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS outcomes (
   amount        TEXT    NOT NULL CHECK (amount GLOB '[0-9]*' AND amount NOT GLOB '*[^0-9]*'),
   reason        TEXT    NULL CHECK (reason IS NULL OR reason IN (
                   'duplicate_payment','expired','org_paused','agent_paused',
-                  'merchant_not_allowed','over_per_payment_limit','over_agent_daily_limit',
+                  'merchant_not_allowed','over_per_payment_limit','over_agent_daily_count','over_agent_daily_limit',
                   'over_org_daily_limit','insufficient_vault_balance','transfer_failed')),
   block_height  INTEGER NOT NULL,
   timestamp_ms  INTEGER NOT NULL,

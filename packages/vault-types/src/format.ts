@@ -97,6 +97,7 @@ export const REASON_LABELS: Record<Reason, string> = {
   agent_paused: 'Agent paused',
   merchant_not_allowed: 'Merchant not allowlisted',
   over_per_payment_limit: 'Over per-payment limit',
+  over_agent_daily_count: 'Over daily payment count',
   over_agent_daily_limit: 'Over agent daily limit',
   over_org_daily_limit: 'Over org daily limit',
   insufficient_vault_balance: 'Vault balance too low',

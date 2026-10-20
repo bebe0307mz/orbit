@@ -166,6 +166,7 @@ export function react(g: GuardState, o: Outcome, symbol: string, now: number): s
     case 'rejected':
       switch (o.reason) {
         case 'over_agent_daily_limit':
+        case 'over_agent_daily_count':
         case 'over_org_daily_limit':
           g.blockedUntil = nextUtcMidnight(now);
           g.blockedWhy = o.reason;

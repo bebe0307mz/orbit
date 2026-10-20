@@ -72,8 +72,9 @@ describe('ids and keys', () => {
 });
 
 describe('reason codes', () => {
-  it('has exactly the 10 codes with plain words', () => {
-    expect(REASON_CODES).toHaveLength(10);
+  it('has exactly the 11 codes with plain words', () => {
+    expect(REASON_CODES).toHaveLength(11);
+    expect(reasonLabel('over_agent_daily_count')).toBe('Over daily payment count');
     for (const c of REASON_CODES) expect(REASON_LABELS[c]).toBeTruthy();
     expect(reasonLabel('agent_paused')).toBe('Agent paused');
     expect(reasonLabel('transfer_failed')).toBe('Transfer failed, refunded');
