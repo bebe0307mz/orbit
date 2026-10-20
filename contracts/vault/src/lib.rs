@@ -15,7 +15,10 @@ use near_sdk::{
     Promise, PromiseError, PromiseOrValue, PublicKey,
 };
 
-pub const MIN_PAYMENT: u128 = 1_000;
+pub const MIN_PAYMENT: u128 = 10_000;
+/// Default and bounds for an agent's accepted payments per UTC day (bounds storage growth per agent per day).
+pub const DEFAULT_MAX_PAYMENTS_PER_DAY: u32 = 200;
+pub const MAX_PAYMENTS_PER_DAY_CAP: u32 = 1_000;
 pub const PAY_GAS_MIN: Gas = Gas::from_tgas(60);
 pub const FT_TRANSFER_GAS: Gas = Gas::from_tgas(15);
 pub const SETTLE_GAS: Gas = Gas::from_tgas(20);
@@ -94,6 +97,8 @@ pub enum Reason {
     OverOrgDailyLimit = 8,
     InsufficientVaultBalance = 9,
     TransferFailed = 10,
+    /// Checked right after OverPerPaymentLimit (code value only names it; the check order is in `pay`).
+    OverAgentDailyCount = 11,
 }
 
 impl Reason {
@@ -109,6 +114,7 @@ impl Reason {
             Reason::OverOrgDailyLimit => "over_org_daily_limit",
             Reason::InsufficientVaultBalance => "insufficient_vault_balance",
             Reason::TransferFailed => "transfer_failed",
+            Reason::OverAgentDailyCount => "over_agent_daily_count",
         }
     }
 
@@ -125,6 +131,7 @@ impl Reason {
             OverOrgDailyLimit,
             InsufficientVaultBalance,
             TransferFailed,
+            OverAgentDailyCount,
         ]
         .into_iter()
         .find(|r| *r as u8 == code)
@@ -145,14 +152,27 @@ pub struct Agent {
     pub paid_count: u64,
     pub rejected_count: u64,
     pub failed_count: u64,
+    /// Accepted (reserved) payments allowed per UTC day; each one stores a payment record forever.
+    pub max_payments_per_day: u32,
+    /// Accepted payments on `day` (reserved ones count; a refund does not give the slot back).
+    pub payments_today: u32,
 }
 
 impl Agent {
-    /// Lazy day rollover: `spent` resets, `reserved` never does.
+    /// Lazy day rollover: `spent` and `payments_today` reset, `reserved` never does.
     fn roll(&mut self, today: u32) {
         if self.day < today {
             self.day = today;
             self.spent = 0;
+            self.payments_today = 0;
+        }
+    }
+
+    fn payments_on(&self, today: u32) -> u32 {
+        if self.day < today {
+            0
+        } else {
+            self.payments_today
         }
     }
 
@@ -242,6 +262,8 @@ pub struct AgentView {
     pub paid_count: u64,
     pub rejected_count: u64,
     pub failed_count: u64,
+    pub max_payments_per_day: u32,
+    pub payments_today: u32,
 }
 
 #[near(serializers = [json])]
@@ -412,6 +434,8 @@ pub struct Vault {
     agents: IterableMap<u32, Agent>,
     agent_by_pk: LookupMap<PublicKey, u32>,
     next_agent_id: u32,
+    /// Non-revoked agents; MAX_AGENTS applies to this, so revoked agents free a slot.
+    active_agent_count: u32,
     merchants: IterableMap<AccountId, String>,
     payments: LookupMap<[u8; 32], Payment>,
     pending: IterableSet<[u8; 32]>,
@@ -461,6 +485,7 @@ impl Vault {
             agents: IterableMap::new(StorageKey::Agents),
             agent_by_pk: LookupMap::new(StorageKey::AgentByPk),
             next_agent_id: 1,
+            active_agent_count: 0,
             merchants: IterableMap::new(StorageKey::Merchants),
             payments: LookupMap::new(StorageKey::Payments),
             pending: IterableSet::new(StorageKey::Pending),
@@ -552,6 +577,8 @@ impl Vault {
             Some(Reason::MerchantNotAllowed)
         } else if amount > agent.per_payment_limit {
             Some(Reason::OverPerPaymentLimit)
+        } else if agent.payments_today >= agent.max_payments_per_day {
+            Some(Reason::OverAgentDailyCount)
         } else if add(add(agent.spent, agent.reserved), amount) > agent.daily_limit {
             Some(Reason::OverAgentDailyLimit)
         } else if add(add(self.org_spent, self.org_reserved), amount) > self.org_daily_limit {
@@ -595,6 +622,7 @@ impl Vault {
         );
         self.pending.insert(pid);
         agent.reserved = add(agent.reserved, amount);
+        agent.payments_today += 1;
         self.agents.insert(agent_id, agent);
         self.org_reserved = add(self.org_reserved, amount);
         self.reserved = add(self.reserved, amount);
@@ -703,8 +731,10 @@ impl Vault {
         per_payment_limit: U128,
         daily_limit: U128,
         allowance: U128,
+        max_payments_per_day: Option<u32>,
     ) -> u32 {
         self.auth_owner();
+        let max_payments_per_day = Self::check_count(max_payments_per_day);
         if !valid_name(&name) {
             fail("E_ARGS", "name must be 1 to 32 chars [a-z0-9-]");
         }
@@ -714,8 +744,8 @@ impl Vault {
         if per_payment_limit.0 > daily_limit.0 {
             fail("E_ARGS", "per_payment_limit > daily_limit");
         }
-        if self.agents.len() >= MAX_AGENTS {
-            fail("E_ARGS", "max 50 agents");
+        if self.active_agent_count >= MAX_AGENTS {
+            fail("E_ARGS", "max 50 non-revoked agents");
         }
         let allowance = Self::check_allowance(allowance);
         let id = self.next_agent_id;
@@ -734,8 +764,11 @@ impl Vault {
                 paid_count: 0,
                 rejected_count: 0,
                 failed_count: 0,
+                max_payments_per_day,
+                payments_today: 0,
             },
         );
+        self.active_agent_count += 1;
         self.agent_by_pk.insert(public_key.clone(), id);
         let me = env::current_account_id();
         Promise::new(me.clone())
@@ -744,13 +777,20 @@ impl Vault {
         emit(
             "agent_registered",
             json!({"agent_id": id, "name": name, "pk": public_key,
-                   "per_payment_limit": per_payment_limit, "daily_limit": daily_limit}),
+                   "per_payment_limit": per_payment_limit, "daily_limit": daily_limit,
+                   "max_payments_per_day": max_payments_per_day}),
         );
         id
     }
 
     #[payable]
-    pub fn set_agent_limits(&mut self, agent_id: u32, per_payment_limit: U128, daily_limit: U128) {
+    pub fn set_agent_limits(
+        &mut self,
+        agent_id: u32,
+        per_payment_limit: U128,
+        daily_limit: U128,
+        max_payments_per_day: Option<u32>,
+    ) {
         self.auth_owner();
         if per_payment_limit.0 > daily_limit.0 {
             fail("E_ARGS", "per_payment_limit > daily_limit");
@@ -761,10 +801,15 @@ impl Vault {
         }
         agent.per_payment_limit = per_payment_limit.0;
         agent.daily_limit = daily_limit.0;
+        if max_payments_per_day.is_some() {
+            agent.max_payments_per_day = Self::check_count(max_payments_per_day);
+        }
+        let count = agent.max_payments_per_day;
         self.agents.insert(agent_id, agent);
         emit(
             "agent_limits_set",
-            json!({"agent_id": agent_id, "per_payment_limit": per_payment_limit, "daily_limit": daily_limit}),
+            json!({"agent_id": agent_id, "per_payment_limit": per_payment_limit, "daily_limit": daily_limit,
+                   "max_payments_per_day": count}),
         );
     }
 
@@ -802,6 +847,7 @@ impl Vault {
             fail("E_STATE", "agent already revoked");
         }
         agent.status = AgentStatus::Revoked;
+        self.active_agent_count -= 1;
         let pk = agent.pk.clone();
         self.agents.insert(agent_id, agent);
         Promise::new(env::current_account_id()).delete_key(pk).detach();
@@ -962,7 +1008,7 @@ impl Vault {
             .iter()
             .map(|(id, a)| {
                 let spent = a.spent_on(today);
-                let remaining = if a.status != AgentStatus::Active || self.org_paused {
+                let remaining = if a.status != AgentStatus::Active || self.org_paused || a.payments_on(today) >= a.max_payments_per_day {
                     0
                 } else {
                     a.daily_limit
@@ -984,6 +1030,8 @@ impl Vault {
                     paid_count: a.paid_count,
                     rejected_count: a.rejected_count,
                     failed_count: a.failed_count,
+                    max_payments_per_day: a.max_payments_per_day,
+                    payments_today: a.payments_on(today),
                 }
             })
             .collect();
@@ -1118,6 +1166,14 @@ impl Vault {
             return "owner";
         }
         fail("E_AUTH", "guardian or owner only")
+    }
+
+    fn check_count(n: Option<u32>) -> u32 {
+        let n = n.unwrap_or(DEFAULT_MAX_PAYMENTS_PER_DAY);
+        if n == 0 || n > MAX_PAYMENTS_PER_DAY_CAP {
+            fail("E_ARGS", "max_payments_per_day must be 1 to 1000");
+        }
+        n
     }
 
     fn check_allowance(allowance: U128) -> Allowance {

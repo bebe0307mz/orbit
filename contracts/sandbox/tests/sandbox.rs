@@ -496,7 +496,7 @@ async fn t13(w: &Worker<Sandbox>) -> Result<String> {
 /// S-1(e): how many concurrent pay txs one FC key with a 1 NEAR allowance can have in flight.
 /// Txs beyond that are dropped before inclusion (never executed): no state change.
 async fn s1e_allowance(w: &Worker<Sandbox>) -> Result<String> {
-    let env = Env::new(w, "s1e", Cfg { agents: 1, daily: 10_000_000, per_payment: 1_000, org: 10_000_000, ..Cfg::default() }).await?;
+    let env = Env::new(w, "s1e", Cfg { agents: 1, daily: 10_000_000, per_payment: 10_000, org: 10_000_000, ..Cfg::default() }).await?;
     let pk = env.agent(1).sk.public_key();
     let base = env.w.view_access_key(&env.vault, &pk).await?.nonce;
     let gas_price = env.w.view_block().await?.header().gas_price().as_yoctonear();
@@ -507,7 +507,7 @@ async fn s1e_allowance(w: &Worker<Sandbox>) -> Result<String> {
             env.agent(1)
                 .acct
                 .call(&env.vault, "pay")
-                .args_json(json!({"payment_id": pid("s1e", i), "merchant": env.m1.id(), "amount": "1000", "deadline_ms": deadline}))
+                .args_json(json!({"payment_id": pid("s1e", i), "merchant": env.m1.id(), "amount": "10000", "deadline_ms": deadline}))
                 .gas(PAY_GAS)
                 .transact_async()
                 .await?,
@@ -737,7 +737,7 @@ async fn t25_t26(w: &Worker<Sandbox>) -> Result<String> {
 
 const ADMIN_METHODS: &[&str] = &[
     "on_payment_settled", "on_withdraw_settled", "on_guardian_rotated", "migrate", "new", "ft_on_transfer",
-    "pause_agent", "pause_all", "register_agent", "rotate_guardian", "withdraw", "upgrade", "resume_all",
+    "pause_agent", "pause_all", "register_agent", "rotate_guardian", "withdraw", "upgrade", "resume_all", "remove_merchant",
     "resume_agent", "revoke_agent", "set_agent_limits", "set_org_daily_limit", "add_merchant", "refill_agent_key",
 ];
 
@@ -1000,7 +1000,7 @@ async fn t39(w: &Worker<Sandbox>) -> Result<String> {
         .collect();
     r.into_result()?;
     // Warm one rejection, then 299 more: storage must not change.
-    expect_status!(env.pay(2, &pid("t39", 1), env.m2.id(), 1_000).await?, "rejected:merchant_not_allowed");
+    expect_status!(env.pay(2, &pid("t39", 1), env.m2.id(), 10_000).await?, "rejected:merchant_not_allowed");
     let su0 = env.state().await?["near"]["storage_usage"].as_u64().unwrap();
     let deadline = env.now_ms().await? + 300_000;
     for wave in 0..8u64 {
@@ -1010,7 +1010,7 @@ async fn t39(w: &Worker<Sandbox>) -> Result<String> {
             env.agent(2)
                 .acct
                 .call(&env.vault, "pay")
-                .args_json(json!({"payment_id": pid("t39", i), "merchant": env.m2.id(), "amount": "1000", "deadline_ms": deadline}))
+                .args_json(json!({"payment_id": pid("t39", i), "merchant": env.m2.id(), "amount": "10000", "deadline_ms": deadline}))
                 .gas(PAY_GAS)
                 .transact_async()
                 .await?,
@@ -1116,6 +1116,52 @@ async fn t35b(w: &Worker<Sandbox>) -> Result<String> {
     expect_status!(env.pay(1, &pid("t35b", 2), env.m1.id(), 50_000).await?, "paid");
     env.check(true).await?;
     Ok(format!("upgrade receipt failed E_STATE in migrate; code unchanged {code_after}; state identical; pay still works"))
+}
+
+async fn storage_of(env: &Env) -> Result<u64> {
+    Ok(env.w.view_account(&env.vault).await?.storage_usage)
+}
+
+/// M1: the per-agent daily payment count bounds storage growth; the next payment is rejected and stores nothing.
+async fn m1_count(w: &Worker<Sandbox>) -> Result<String> {
+    let env = Env::new(w, "m1", Cfg { agents: 1, daily: 10_000_000, org: 10_000_000, ..Cfg::default() }).await?;
+    env.owner_call("set_agent_limits", json!({"agent_id": 1, "per_payment_limit": "100000", "daily_limit": "10000000", "max_payments_per_day": 5})).await?.ok()?;
+    expect_status!(env.pay(1, &pid("m1", 0), env.m1.id(), 10_000).await?, "paid");
+    let s1 = storage_of(&env).await?;
+    expect_status!(env.pay(1, &pid("m1", 1), env.m1.id(), 10_000).await?, "paid");
+    let record = storage_of(&env).await? - s1;
+    let s0 = s1 - record;
+    for i in 2..5 {
+        expect_status!(env.pay(1, &pid("m1", i), env.m1.id(), 10_000).await?, "paid");
+    }
+    let s5 = storage_of(&env).await?;
+    ensure!(s5 - s0 <= 5 * record, "5 payments grew storage by {} > 5 x {record}", s5 - s0);
+    expect_status!(env.pay(1, &pid("m1", 5), env.m1.id(), 10_000).await?, "rejected:over_agent_daily_count");
+    ensure!(storage_of(&env).await? == s5, "the rejected payment grew storage");
+    let a = Env::agent_state(&env.state().await?, 1).clone();
+    ensure!(a["payments_today"] == 5 && a["max_payments_per_day"] == 5 && a["remaining_today"] == "0", "agent view {a}");
+    let small = env.pay(1, &pid("m1", 6), env.m1.id(), 9_999).await?;
+    ensure!(small.status() == "panic:E_ARGS", "below MIN_PAYMENT: {}", small.status());
+    env.check(true).await?;
+    Ok(format!("record {record} bytes; 5 payments grew storage {} bytes (<= 5 x record); 6th rejected over_agent_daily_count with no growth; 9999 below MIN_PAYMENT E_ARGS", s5 - s0))
+}
+
+/// L2: revoked agents free their slot (50 non-revoked maximum).
+async fn l2_slots(w: &Worker<Sandbox>) -> Result<String> {
+    let mut env = Env::new(w, "l2", Cfg { agents: 0, ..Cfg::default() }).await?;
+    for i in 0..50 {
+        env.register(&format!("r{i}"), 1, 2).await?;
+    }
+    let over = env.owner_call("register_agent", json!({"name": "over", "public_key": SecretKey::from_random(KeyType::ED25519).public_key(), "per_payment_limit": "1", "daily_limit": "2", "allowance": "1"})).await?;
+    ensure!(over.status() == "panic:E_ARGS", "51st live agent: {}", over.status());
+    for id in 1..=50u32 {
+        env.owner_call("revoke_agent", json!({"agent_id": id})).await?.ok()?;
+    }
+    let id = env.register("fresh", 100_000, 250_000).await?;
+    ensure!(id == 51, "fresh agent id {id}");
+    expect_status!(env.pay(id, &pid("l2", 1), env.m1.id(), 50_000).await?, "paid");
+    env.check(true).await?;
+    Ok("50 live agents: 51st E_ARGS; after revoking all 50, a new agent registers (id 51) and pays".into())
 }
 
 /// Mainnet build guard: `new` refuses any token other than Circle USDC and a float cap above 20 USDC.
@@ -1228,7 +1274,7 @@ async fn t12_sandbox(w: &Worker<Sandbox>) -> Result<String> {
     env.owner.call(&env.ft, "set_delay_hops").args_json(json!({"hops": 0})).transact().await?.into_result()?;
     expect_status!(env.pay(1, &pid("t12", 11), env.m1.id(), 100_000).await?, "paid");
     expect_status!(env.pay(1, &pid("t12", 12), env.m1.id(), 100_000).await?, "paid");
-    expect_status!(env.pay(1, &pid("t12", 13), env.m1.id(), 1_000).await?, "rejected:over_agent_daily_limit");
+    expect_status!(env.pay(1, &pid("t12", 13), env.m1.id(), 10_000).await?, "rejected:over_agent_daily_limit");
     let s = env.state().await?;
     ensure!(Env::agent_state(&s, 1)["spent_today"] == "250000" && s["org"]["spent_today"] == "250000", "day d+1 settled total != limit");
     env.check(true).await?;
@@ -1273,6 +1319,8 @@ async fn harness() -> Result<()> {
         ("T-35b", "I6 upgrade revert", |w| Box::pin(t35b(w))),
         ("T-50/T-51", "liveness storage", |w| Box::pin(t50_t51(w))),
         ("MAINNET-GUARD", "I12 build pins", |w| Box::pin(mainnet_guard(w))),
+        ("M1", "storage count", |w| Box::pin(m1_count(w))),
+        ("L2", "agent slots", |w| Box::pin(l2_slots(w))),
         ("T-12", "I1 I2 midnight", |w| Box::pin(t12_sandbox(w))),
     ];
     let mut rows = vec![];
