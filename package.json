@@ -12,6 +12,7 @@
     "check:ui": "node harness/ui/check-ui.mjs && node harness/ui/check-live.mjs",
     "check:ui:mock": "node harness/ui/check-ui.mjs",
     "check:ui:live": "node harness/ui/check-live.mjs",
-    "check:contrast": "node harness/ui/contrast.mjs"
+    "check:contrast": "node harness/ui/contrast.mjs",
+    "harness": "node harness/run.mjs"
   }
 }
