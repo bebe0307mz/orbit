@@ -1027,6 +1027,72 @@ async fn t39(w: &Worker<Sandbox>) -> Result<String> {
     Ok(format!("pay receipts gas (Ggas): {gas:?}; 300 outcomes, oldest_seq 44, storage_usage unchanged at {su1} across 298 rejections"))
 }
 
+/// T-18, T-34, T-02(b), T-20 (pending part): with mock-ft delay hops, act between reservation and settlement.
+async fn t18_t34(w: &Worker<Sandbox>) -> Result<String> {
+    let env = Env::new(w, "t18", Cfg::default()).await?;
+    env.owner.call(&env.ft, "set_delay_hops").args_json(json!({"hops": 8})).transact().await?.into_result()?;
+    let envr = &env;
+    let height = |h: near_workspaces::types::CryptoHash| async move { envr.w.view_block().block_hash(h).await.map(|b| b.height()) };
+    let start_pending = |agent: u32, id: String| {
+        let env = &env;
+        async move {
+            let deadline = env.now_ms().await? + 120_000;
+            let st = env
+                .agent(agent)
+                .acct
+                .call(&env.vault, "pay")
+                .args_json(json!({"payment_id": id, "merchant": env.m1.id(), "amount": "50000", "deadline_ms": deadline}))
+                .gas(Gas::from_tgas(300))
+                .transact_async()
+                .await?;
+            let t = Instant::now();
+            loop {
+                let p: Value = env.w.view(&env.vault, "payment").args_json(json!({"payment_id": id})).await?.json()?;
+                if p["status"] == "pending" {
+                    break;
+                }
+                ensure!(p.is_null(), "payment settled before the test could act: {p}");
+                ensure!(t.elapsed() < Duration::from_secs(30), "payment never became pending");
+                tokio::time::sleep(Duration::from_millis(100)).await;
+            }
+            Ok::<_, anyhow::Error>(st)
+        }
+    };
+    let paid_block = |r: &ExecutionFinalResult| r.outcomes().iter().find(|o| o.logs.iter().any(|l| l.contains("\"payment_paid\""))).map(|o| o.block_hash);
+
+    // T-18: pause lands while a1's payment is in flight; the payment still settles, the next one is refused.
+    let st = start_pending(1, pid("t18", 1)).await?;
+    let pause = env.guardian.call(&env.vault, "pause_agent").args_json(json!({"agent_id": 1})).transact().await?;
+    let pause_block = height(pause.outcome().block_hash).await?;
+    pause.into_result()?;
+    let r = st.await?;
+    let pb = height(paid_block(&r).ok_or_else(|| anyhow!("no payment_paid event"))?).await?;
+    ensure!(r.json::<Value>()?["status"] == "paid", "in-flight payment did not settle paid");
+    ensure!(pause_block < pb, "pause block {pause_block} not before payment_paid block {pb}");
+    expect_status!(env.pay(1, &pid("t18", 2), env.m1.id(), 50_000).await?, "rejected:agent_paused");
+
+    // T-34 + T-02(b): merchant removed while a2's payment is in flight; the pending id is already a duplicate.
+    let id = pid("t34", 1);
+    let st = start_pending(2, id.clone()).await?;
+    let dup = env.pay(3, &id, env.m1.id(), 50_000).await?;
+    env.owner_call("remove_merchant", json!({"account": env.m1.id()})).await?.ok()?;
+    let r = st.await?;
+    ensure!(r.json::<Value>()?["status"] == "paid", "in-flight payment to a removed merchant did not settle");
+    ensure!(dup.status() == "rejected:duplicate_payment", "pending id reused: {}", dup.status());
+    expect_status!(env.pay(2, &pid("t34", 2), env.m1.id(), 50_000).await?, "rejected:merchant_not_allowed");
+    env.owner_call("add_merchant", json!({"account": env.m1.id(), "name": "Orbit Data"})).await?.ok()?;
+
+    // T-20 (pending part): revoke while a4's payment is in flight; it still settles.
+    let st = start_pending(4, pid("t20p", 1)).await?;
+    env.owner_call("revoke_agent", json!({"agent_id": 4})).await?.ok()?;
+    let r = st.await?;
+    ensure!(r.json::<Value>()?["status"] == "paid", "in-flight payment of a revoked agent did not settle");
+    env.owner.call(&env.ft, "set_delay_hops").args_json(json!({"hops": 0})).transact().await?.into_result()?;
+    ensure!(env.ft_balance(env.m1.id()).await? == 150_000, "merchant received 3 x 50000");
+    env.check(true).await?;
+    Ok(format!("pause at block {pause_block} before payment_paid at block {pb}; removed merchant and revoked agent: in-flight payments settled paid; pending id duplicate; next pays agent_paused / merchant_not_allowed"))
+}
+
 // ---------- runner ----------
 
 struct Row {
@@ -1061,6 +1127,7 @@ async fn harness() -> Result<()> {
         ("T-35", "I6 upgrade", |w| Box::pin(t35(w))),
         ("T-52", "I6 I11 rotate", |w| Box::pin(t52(w))),
         ("T-39", "I9 ring", |w| Box::pin(t39(w))),
+        ("T-18/T-34", "I3 I5 in-flight", |w| Box::pin(t18_t34(w))),
     ];
     let mut rows = vec![];
     for (id, inv, f) in scenarios {

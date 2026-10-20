@@ -10,6 +10,7 @@ Builds: `scripts/build-contracts.sh` (cargo-near 0.22, rust 1.86, near-sdk 5.27)
 - `ft_transfer` to an unregistered receiver fails in one receipt; the callback sees `Failed` and refunds.
 - `DeleteKey` + `AddKey` of one pk in one batch works (`refill_agent_key`, `rotate_guardian`).
 - `upgrade` (raw wasm input, deploy + `migrate` in one batch) works with a 278 KB wasm. A panicking `migrate` variant is not tested yet.
+- In-flight (mock-ft `set_delay_hops`): a guardian pause, merchant removal or revoke landing between reservation and settlement does not stop that payment (settles `paid`); the next one is refused (T-18, T-34).
 - Gas per pay (measured): pay 3.3 Tgas, ft_transfer 1.8, callback 2.7 (budget 20).
 
 ## Deviations from the spine
@@ -22,6 +23,7 @@ Builds: `scripts/build-contracts.sh` (cargo-near 0.22, rust 1.86, near-sdk 5.27)
 - `add_merchant` on an existing account overwrites the name; merchant name 1 to 64 bytes. `remove_merchant` of an unknown account is `E_ARGS`.
 - `resume_agent` on a non-paused agent is `E_STATE`. `withdraw(0)` is `E_ARGS`.
 - Owner calls with the wrong deposit panic `E_DEPOSIT` (wrong predecessor is `E_AUTH`).
+- Token backing (C2/P6) `ft_balance_of(vault) >= available + reserved` holds only when nothing is pending: between a payment's `ft_transfer` and its settle callback the tokens have left while still counted in `reserved`. In-flight-safe form: `ft_balance_of >= available + (reserved - org.reserved)`. Seen on testnet with views at final.
 - Lowering `daily_limit` while payments are reserved can let that day's settled total exceed the new (lower) limit, never the limit in force at reservation time.
 
 ## View shape changes (for Builder B)
