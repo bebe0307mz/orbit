@@ -3028,6 +3028,9 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "hex",
+ "near-crypto 0.34.7",
+ "near-jsonrpc-client",
+ "near-primitives 0.34.7",
  "near-workspaces",
  "serde_json",
  "sha2",
