@@ -36,6 +36,8 @@ export class Syncer {
   private opts: SyncerOptions;
   private now: () => number;
   private running: Promise<void> | null = null;
+  /** read outcomes() at the snapshot's block; false after the RPC refuses pinned reads */
+  private pinned = true;
 
   constructor(rpc: NearRpc, store: Store, log: Logger, opts: SyncerOptions) {
     this.rpc = rpc;
@@ -76,7 +78,17 @@ export class Syncer {
         const last = this.store.lastSeq();
         let want = last == null ? 0 : last + 1;
         if (want >= next || pages >= PAGES_PER_TICK) break;
-        const { value } = await this.rpc.view<OutcomesView>(this.opts.vaultAccount, 'outcomes', { from_seq: want, limit: OUTCOMES_MAX_LIMIT }, { block_id: S.block_height });
+        const args = { from_seq: want, limit: OUTCOMES_MAX_LIMIT };
+        let value: OutcomesView;
+        try {
+          value = (await this.rpc.view<OutcomesView>(this.opts.vaultAccount, 'outcomes', args, this.pinned ? { block_id: S.block_height } : { finality: 'final' })).value;
+        } catch (e) {
+          if (!this.pinned || (e instanceof RpcError && e.code === 'view_failed')) throw e;
+          // E7 fallback: this RPC does not serve views at a pinned recent block; read at final from now on
+          this.pinned = false;
+          this.log.warn('outcomes_pinned_read_unsupported', { error: (e as Error).message });
+          value = (await this.rpc.view<OutcomesView>(this.opts.vaultAccount, 'outcomes', args, { finality: 'final' })).value;
+        }
         pages++;
         let gap = null;
         if (value.oldest_seq > want) {

@@ -197,6 +197,15 @@ describe('syncer', () => {
     expect(s.snapshot.stale).toBe(true);
   });
 
+  it('falls back to finality final when the RPC refuses outcomes() at a pinned block (E7)', async () => {
+    const chain = new FakeChain();
+    const orig = chain.handle.bind(chain);
+    chain.handle = (r) => (r.params.method_name === 'outcomes' && 'block_id' in r.params ? { error: { name: 'HANDLER_ERROR', cause: { name: 'UNKNOWN_BLOCK', info: {} } } } : orig(r));
+    const c = await setup({ chain });
+    expect((await req(c, '/v1/state')).json.sync).toMatchObject({ last_seq: 54, counts_match: true });
+    expect(c.log.lines.some((l) => l.event === 'outcomes_pinned_read_unsupported')).toBe(true);
+  });
+
   it('restart continues from last_seq and refuses a DB from another vault', async () => {
     const chain = new FakeChain();
     const first = await setup({ chain });
