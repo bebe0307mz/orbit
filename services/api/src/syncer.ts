@@ -34,6 +34,8 @@ export class Syncer {
   /** C2 token backing, checked every BACKING_EVERY ticks at the snapshot's block */
   backing: { ok: boolean; balance: string; required: string; strict: boolean; block_height: number } | null = null;
   private ticks = 0;
+  private lastNextSeq = -1;
+  private seqChangedAt = 0;
   private rpc: NearRpc;
   private store: Store;
   private log: Logger;
@@ -70,6 +72,10 @@ export class Syncer {
       return;
     }
     this.latest = { S, fetched_at_ms: this.now() };
+    if (S.counts.next_seq !== this.lastNextSeq) {
+      if (this.lastNextSeq >= 0) this.seqChangedAt = Date.now();
+      this.lastNextSeq = S.counts.next_seq;
+    }
     this.rpcOk = true;
     this.failedTicks = 0;
     this.lastError = null;
@@ -149,6 +155,12 @@ export class Syncer {
       this.log.critical('contract_upgraded', { from: known, to: S.version, block_height: S.block_height });
     }
     if (known !== S.version) this.store.set('contract_version', S.version);
+  }
+
+  /** Next tick delay: fast while payments are moving (pending, or new outcomes in the last 20 s). */
+  nextDelay(baseMs: number, fastMs: number): number {
+    const busy = (this.latest?.S.pending_count ?? 0) > 0 || Date.now() - this.seqChangedAt < 20_000;
+    return busy ? Math.min(fastMs, baseMs) : baseMs;
   }
 
   stale(): boolean {

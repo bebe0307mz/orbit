@@ -45,6 +45,7 @@ export function useStore(): Store {
 
 const key = (t: PauseTarget) => String(t);
 const OP_POLL_MS = 1000;
+const FAST_POLL_MS = 1000;
 
 export function StoreProvider({ source, pollMs, children }: { source: VaultSource; pollMs: number; children: ReactNode }) {
   const [state, setState] = useState<DashboardState | null>(null);
@@ -59,10 +60,19 @@ export function StoreProvider({ source, pollMs, children }: { source: VaultSourc
   const loadingOutcomes = useRef(false);
   const alive = useRef(true);
 
+  // Adaptive polling: fast while payments are moving (something pending, or new outcomes in the last 20 s), so the
+  // short in-flight phase shows up; the base interval when idle.
+  const activity = useRef({ nextSeq: -1, changedAt: 0, pending: 0 });
   const poll = useCallback(async () => {
     try {
       const s = await source.getState();
       if (!alive.current) return;
+      const a = activity.current;
+      if (s.counts.next_seq !== a.nextSeq) {
+        if (a.nextSeq >= 0) a.changedAt = Date.now();
+        a.nextSeq = s.counts.next_seq;
+      }
+      a.pending = s.pending_count;
       setState(s);
       setLoadError(null);
     } catch (e) {
@@ -75,11 +85,18 @@ export function StoreProvider({ source, pollMs, children }: { source: VaultSourc
 
   useEffect(() => {
     alive.current = true;
-    poll();
-    const id = setInterval(poll, pollMs);
+    let timer: ReturnType<typeof setTimeout>;
+    const loop = async () => {
+      await poll();
+      if (!alive.current) return;
+      const a = activity.current;
+      const busy = a.pending > 0 || Date.now() - a.changedAt < 20_000;
+      timer = setTimeout(loop, busy ? Math.min(FAST_POLL_MS, pollMs) : pollMs);
+    };
+    loop();
     return () => {
       alive.current = false;
-      clearInterval(id);
+      clearTimeout(timer);
     };
   }, [poll, pollMs]);
 

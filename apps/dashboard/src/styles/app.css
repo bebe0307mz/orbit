@@ -44,7 +44,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .tag { display: inline-flex; align-items: center; height: 20px; padding: 0 6px; border-radius: var(--r-1); background: var(--bg-subtle); border: 1px solid var(--line); font-size: 12px; color: var(--muted); white-space: nowrap; }
 .tag.testnet { color: var(--warn); }
 .topbar .badges { display: flex; align-items: center; gap: 6px; }
-.topbar .tag.sample { border-style: dashed; color: var(--ink-2); }
+.topbar .tag.sample { border-style: dashed; color: var(--ink-2); gap: .3em; }
 .tabs { display: flex; align-items: stretch; gap: var(--s5); }
 .tab {
   position: relative; display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 14px; font-weight: 500;
@@ -297,6 +297,11 @@ table.t td.c-reason { color: var(--ink-2); }
 .st .rs { display: none; color: var(--ink-2); }
 td.c-st .t2 { display: none; }
 tr.pend td { background: var(--bg-subtle); }
+/* a row that arrived live: a short accent wash, then normal (no motion under reduced motion) */
+.ac table.t tbody tr.arrived td { animation: orbit-arrived 2.4s ease-out; }
+@keyframes orbit-arrived { 0%, 30% { background: var(--accent-bg); } 100% { background: transparent; } }
+@media (prefers-reduced-motion: reduce) { .ac table.t tbody tr.arrived td { animation: none; } }
+html { overflow-anchor: none; }
 tr.detail td { height: auto; white-space: normal; padding: 0 var(--s3) var(--s3); background: var(--bg-hover); cursor: default; }
 .dgrid { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 0 var(--s4); font-size: 13px; max-width: 760px; margin: 0; }
 .dgrid > dt, .dgrid > dd { margin: 0; min-height: 28px; display: flex; align-items: center; border-top: 1px solid var(--line); min-width: 0; }

@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState } from 'react';
+import { Fragment, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   dateShort, explorerBase, fmtInt, fmtUsd, hhmm, hhmmss, midTrunc, reasonLabel, timeCell,
   type DashboardState, type OutcomeItem,
@@ -86,6 +86,56 @@ export function ActivityScreen({ route }: { route: Route }) {
   const [current, setCurrent] = useState<string | null>(null);
   const rows = useActivityRows({ status, agent, merchant });
   const shown = rows.shown;
+
+  // Live updates: rows that arrive after the first render get a short highlight; when the reader has scrolled down,
+  // the first visible row keeps its place on screen while new rows are inserted above it (manual scroll anchoring,
+  // so it also works where the browser has none).
+  // baseline: the list as first fully shown; only rows newer than it (higher seq, or a new pending payment) count as
+  // live arrivals, so the initial history load and Load older never flash
+  const base = useRef<{ maxSeq: number; pend: Set<string> } | null>(null);
+  const [fresh, setFresh] = useState<Set<string>>(new Set());
+  const anchor = useRef<{ key: string; top: number } | null>(null);
+  const pendKeys = rows.pend.map((x) => 'p' + x.payment_id);
+  const keySig = [...pendKeys, ...shown.map((o) => 's' + o.seq)].join(',');
+  const historyReady = !rows.loading && (shown.length > 0 || (s?.counts.next_seq ?? 0) === 0 || rows.pend.length > 0 && status === 'pending');
+  useLayoutEffect(() => {
+    const a = anchor.current;
+    if (a && window.scrollY > 0) {
+      const el = document.querySelector<HTMLElement>(`tr.row[data-key="${CSS.escape(a.key)}"]`);
+      if (el) {
+        const delta = el.getBoundingClientRect().top - a.top;
+        if (Math.abs(delta) >= 1) window.scrollBy(0, delta);
+      }
+    }
+    if (!historyReady) return;
+    const maxSeq = shown.reduce((m, o) => Math.max(m, o.seq), -1);
+    if (!base.current) {
+      base.current = { maxSeq, pend: new Set(pendKeys) };
+      return;
+    }
+    const b = base.current;
+    const added = [...pendKeys.filter((k) => !b.pend.has(k)), ...shown.filter((o) => o.seq > b.maxSeq).map((o) => 's' + o.seq)];
+    pendKeys.forEach((k) => b.pend.add(k));
+    b.maxSeq = Math.max(b.maxSeq, maxSeq);
+    if (added.length) {
+      setFresh(new Set(added));
+      const t = setTimeout(() => setFresh(new Set()), 2400);
+      return () => clearTimeout(t);
+    }
+  }, [keySig, historyReady]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    base.current = null; // a filter change is a new list, not live arrivals
+  }, [status, agent, merchant]);
+  useEffect(() => {
+    const record = () => {
+      const header = document.querySelector('.topbar')?.getBoundingClientRect().bottom ?? 0;
+      const first = Array.from(document.querySelectorAll<HTMLElement>('tr.row')).find((r) => r.getBoundingClientRect().bottom > header + 1);
+      anchor.current = first && window.scrollY > 0 ? { key: first.dataset.key!, top: first.getBoundingClientRect().top } : null;
+    };
+    record();
+    window.addEventListener('scroll', record, { passive: true });
+    return () => window.removeEventListener('scroll', record);
+  });
 
   const setFilter = (patch: Partial<{ status: Status; agent: string; merchant: string }>) => {
     const next = { status, agent, merchant, ...patch };
@@ -252,7 +302,7 @@ export function ActivityScreen({ route }: { route: Route }) {
               const k = 'p' + x.payment_id;
               return (
                 <Fragment key={k}>
-                  <tr className={'row pend' + (open[k] ? ' open' : '') + (current === k ? ' current' : '')} data-key={k} tabIndex={-1} aria-expanded={!!open[k]} onClick={() => toggle(k)}>
+                  <tr className={'row pend' + (open[k] ? ' open' : '') + (current === k ? ' current' : '') + (fresh.has(k) ? ' arrived' : '')} data-key={k} tabIndex={-1} aria-expanded={!!open[k]} onClick={() => toggle(k)}>
                     <td className="c-time">reserved {hhmmss(x.reserved_at_ms)}</td>
                     <td className="c-agent truncate"><a href={hrefFor('agents', { agent: x.agent_id })} onClick={(e) => e.stopPropagation()}>{agentName(x.agent_id)}</a></td>
                     <td className="c-merch truncate"><Merch acct={x.merchant} s={s} /></td>
@@ -275,7 +325,7 @@ export function ActivityScreen({ route }: { route: Route }) {
                   {divider.map((g) => (
                     <tr className="gap-row" key={'g' + g.from_seq} data-testid="gap-row"><td colSpan={6}>#{g.from_seq} to #{g.to_seq} missing · not in the vault ring any more</td></tr>
                   ))}
-                  <tr className={'row' + (open[k] ? ' open' : '') + (current === k ? ' current' : '')} data-key={k} tabIndex={-1} aria-expanded={!!open[k]} onClick={() => toggle(k)}>
+                  <tr className={'row' + (open[k] ? ' open' : '') + (current === k ? ' current' : '') + (fresh.has(k) ? ' arrived' : '')} data-key={k} tabIndex={-1} aria-expanded={!!open[k]} onClick={() => toggle(k)}>
                     <td className="c-time">{timeCell(o.timestamp_ms, s.snapshot.timestamp_ms)}</td>
                     <td className="c-agent truncate"><a href={hrefFor('agents', { agent: o.agent_id })} onClick={(e) => e.stopPropagation()}>{agentName(o.agent_id)}</a></td>
                     <td className="c-merch truncate"><Merch acct={o.merchant} s={s} /></td>

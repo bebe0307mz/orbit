@@ -36,7 +36,14 @@ export async function startApi(config: ApiConfig, opts: { log?: Logger; fetchImp
       fn().catch((e) => log.error('loop_error', { error: (e as Error).message })).finally(() => (busy = false));
     }, ms));
   };
-  loop(config.syncIntervalMs, () => syncer.tick());
+  // sync loop: base interval, faster while payments are moving (BACKING_EVERY counts ticks, so it reads more often then)
+  let syncTimer: NodeJS.Timeout;
+  let syncing = true;
+  const syncLoop = async () => {
+    await syncer.tick().catch((e) => log.error('loop_error', { error: (e as Error).message }));
+    if (syncing) syncTimer = setTimeout(syncLoop, syncer.nextDelay(config.syncIntervalMs, config.syncFastMs));
+  };
+  syncTimer = setTimeout(syncLoop, config.syncIntervalMs);
   loop(config.opPollMs, () => guardian.trackOpen());
   loop(60_000, () => guardian.refreshAllowance());
 
@@ -49,6 +56,8 @@ export async function startApi(config: ApiConfig, opts: { log?: Logger; fetchImp
     server, url, store, syncer, guardian,
     async stop() {
       timers.forEach(clearInterval);
+      syncing = false;
+      clearTimeout(syncTimer);
       await new Promise<void>((r) => server.close(() => r()));
       server.closeAllConnections?.();
       store.close();

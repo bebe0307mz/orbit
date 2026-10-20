@@ -39,6 +39,8 @@ async function matrix() {
     await o.page.waitForFunction(() => window.__ORBIT_DEBUG__ && window.__ORBIT_DEBUG__.outcomes.length > 0);
     ok((await o.page.getAttribute('html', 'data-theme')) === theme, `agents: theme attribute is ${theme}`);
     ok(await o.page.locator('[data-testid="sample-badge"]').isVisible(), 'mock source: Sample data badge visible next to the network badge');
+    const badge = (await o.page.locator('[data-testid="sample-badge"]').innerText()).replace(/\s+/g, ' ').trim();
+    ok(badge === (width < 421 ? 'Sample' : 'Sample data'), `badge reads "${badge}"`);
     const rowTops = await o.page.evaluate(() => ['.topbar .wordmark', '.topbar .badges', '.topbar .right'].map((q) => Math.round(document.querySelector(q).getBoundingClientRect().top)));
     ok(new Set(rowTops).size === 1, `header row 1 stays one line (tops ${rowTops.join(',')})`);
     await checkFigures(o.page, 'agents');
@@ -57,6 +59,8 @@ async function matrix() {
     o = await open({ width, theme, hash: '#/activity' });
     await o.page.waitForSelector('[data-check="count.all"]');
     await o.page.waitForFunction(() => document.querySelectorAll('tr.row').length > 5);
+    await o.page.waitForTimeout(400);
+    ok((await o.page.locator('tr.row.arrived').count()) === 0, 'activity first load: no row flagged as a live arrival');
     await checkFigures(o.page, 'activity');
     await noHScroll(o.page, 'activity');
     await copyRules(o.page, 'activity');

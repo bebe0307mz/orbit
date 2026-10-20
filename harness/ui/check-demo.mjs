@@ -99,6 +99,56 @@ try {
 }
 console.log(`merchant and api up; running the agents for ${MINUTES} minutes`);
 
+/* ---------- live dashboard while the agents run (no reloads) ---------- */
+let browser = await chromium.launch({ executablePath: EXE });
+use(browser, `${ORIGIN}/`);
+const live = { top: null, scrolled: null, panel: null };
+live.top = await open({ theme: 'dark', hash: '#/activity' });
+live.scrolled = await open({ theme: 'dark', hash: '#/activity', height: 700 });
+const s0 = await (await fetch(`${ORIGIN}/v1/state`)).json();
+const watched = s0.agents.find((a) => a.name === 'price-watcher');
+live.panel = await open({ theme: 'light', hash: `#/agents?agent=${watched?.id ?? 11}` });
+for (const o of [live.top, live.scrolled]) await o.page.waitForFunction(() => document.querySelectorAll('tr.row').length >= 20, null, { timeout: 30000 });
+await live.panel.page.waitForSelector('#panel .tx1', { timeout: 30000 }).catch(() => {});
+await live.scrolled.page.evaluate(() => window.scrollTo(0, 420));
+await live.scrolled.page.waitForTimeout(300);
+for (const o of Object.values(live)) await o.page.evaluate(() => { window.__noReload = true; });
+const L = { samples: 0, topKeys: new Set(), topFirst: [], rowsStart: 0, rowsMax: 0, anchorDrift: 0, anchorChecks: 0, scrollYStart: 0, scrollYEnd: 0, fresh: 0, inflightSeen: 0, inflightShot: false, freshShot: false, panelFirst: new Set(), reloads: 0 };
+L.rowsStart = await live.top.page.$$eval('tr.row', (r) => r.length);
+L.scrollYStart = await live.scrolled.page.evaluate(() => window.scrollY);
+const anchorKey = await live.scrolled.page.evaluate(() => {
+  const h = document.querySelector('.topbar').getBoundingClientRect().bottom;
+  const r = Array.from(document.querySelectorAll('tr.row')).find((x) => x.getBoundingClientRect().top >= h);
+  return r ? { key: r.dataset.key, top: r.getBoundingClientRect().top } : null;
+});
+let sampling = true;
+const sampleLoop = (async () => {
+  while (sampling) {
+    try {
+      L.samples++;
+      const t = await live.top.page.evaluate(() => ({ n: document.querySelectorAll('tr.row').length, first: document.querySelector('tr.row')?.dataset.key, fresh: document.querySelectorAll('tr.row.arrived').length, broken: Array.from(document.querySelectorAll('tr.row')).filter((r) => getComputedStyle(r).display !== 'table-row').length, ok: window.__noReload === true }));
+      L.rowsMax = Math.max(L.rowsMax, t.n);
+      if (t.first && !L.topKeys.has(t.first)) { L.topKeys.add(t.first); L.topFirst.push(t.first); }
+      L.fresh += t.fresh;
+      L.broken = Math.max(L.broken ?? 0, t.broken);
+      if (!t.ok) L.reloads++;
+      if (t.fresh && !L.freshShot) { L.freshShot = true; await shot(live.top.page, 'demo-live-activity-new-row-dark'); }
+      if (anchorKey) {
+        const a = await live.scrolled.page.evaluate((k) => { const el = document.querySelector(`tr.row[data-key="${CSS.escape(k)}"]`); return el ? { top: el.getBoundingClientRect().top, y: window.scrollY, ok: window.__noReload === true } : null; }, anchorKey.key);
+        if (a) { L.anchorChecks++; L.anchorDrift = Math.max(L.anchorDrift, Math.abs(a.top - anchorKey.top)); L.scrollYEnd = a.y; if (!a.ok) L.reloads++; }
+      }
+      const pnl = await live.panel.page.evaluate(() => ({ inflight: !!document.querySelector('[data-check="inflight"]'), first: document.querySelector('#panel .tx1')?.textContent ?? '', ok: window.__noReload === true }));
+      if (pnl.inflight) {
+        L.inflightSeen++;
+        if (!L.inflightShot) { L.inflightShot = true; await shot(live.panel.page, 'demo-live-inflight-light'); }
+      }
+      if (pnl.first) L.panelFirst.add(pnl.first);
+      if (!pnl.ok) L.reloads++;
+    } catch {}
+    await new Promise((r) => setTimeout(r, 500));
+  }
+})();
+
 const before = new Set(readdirSync(join(OUT, '..')).filter((d) => d.startsWith('testnet-agents-')));
 const demoLog = join(work, `agents-${Date.now()}.jsonl`);
 const agents = spawn('node', [...NODE_TS, 'src/main.ts', 'run', '--minutes', MINUTES, '--proof'], {
@@ -119,6 +169,11 @@ const sampler = setInterval(async () => {
 }, 2000);
 const agentsCode = await new Promise((r) => agents.on('close', r));
 clearInterval(sampler);
+await new Promise((r) => setTimeout(r, 4000)); // last settlements reach the dashboard
+sampling = false;
+await sampleLoop;
+await shot(live.scrolled.page, 'demo-live-activity-scrolled-dark');
+await shot(live.panel.page, 'demo-live-panel-light');
 const proofDir = readdirSync(join(OUT, '..')).filter((d) => d.startsWith('testnet-agents-') && !before.has(d)).sort().pop();
 group('demo run');
 ok(agentsCode === 0, `demo:agents run --proof exited ${agentsCode}`);
@@ -133,7 +188,6 @@ const paidIds = new Set(purchases.filter((p) => p.status === 'paid').map((p) => 
 const uiChecks = [];
 const uiOk = (name, cond, detail = '') => { ok(cond, `${name}${detail ? ` (${detail})` : ''}`); uiChecks.push({ check: name, ok: !!cond, detail: String(detail) }); };
 const apiState = async () => ({ state: await (await fetch(`${ORIGIN}/v1/state`)).json(), outcomes: [] });
-let browser;
 try {
   // let the syncer catch up with the last outcomes
   for (let i = 0; i < 20; i++) {
@@ -152,8 +206,14 @@ try {
   const reported = listed.filter((i) => i.tx_hash);
   uiOk('tx hashes reported and verified (POST /v1/tx-reports)', reported.length > 0, `${reported.length} of ${listed.length} rows carry a verified tx hash`);
 
-  browser = await chromium.launch({ executablePath: EXE });
-  use(browser, `${ORIGIN}/`);
+  group('demo live dashboard');
+  uiOk('dashboard updates live without reload (Activity, Agents, panel)', L.reloads === 0 && L.rowsMax > L.rowsStart, `${L.samples} samples, rows ${L.rowsStart} -> ${L.rowsMax}, reloads ${L.reloads}`);
+  uiOk('new rows appear at the top of Activity', L.topFirst.length > 1, `${L.topFirst.length} different first rows`);
+  uiOk('scrolled Activity keeps its place while rows arrive above (anchor drift <= 2 px)', !!anchorKey && L.anchorChecks > 0 && L.anchorDrift <= 2 && L.scrollYEnd > L.scrollYStart, anchorKey ? `drift ${L.anchorDrift.toFixed(1)} px over ${L.anchorChecks} checks, scrollY ${L.scrollYStart} -> ${L.scrollYEnd}` : 'no anchor row');
+  uiOk('rows that arrive live are highlighted briefly and still lay out as table rows', L.fresh > 0 && !L.broken, `${L.fresh} highlighted row samples, ${L.broken ?? 0} rows not display:table-row`);
+  uiOk('price-watcher panel recent payments update live', L.panelFirst.size > 1, `${L.panelFirst.size} different newest rows`);
+  uiOk('In flight figure shows while payments are pending', L.inflightSeen > 0, `${L.inflightSeen} of ${L.samples} samples`);
+  for (const o of Object.values(live)) await close(o, 'live page');
   for (const theme of ['dark', 'light']) {
     group(`demo dashboard ${theme}`);
     const o = await open({ theme, hash: '#/agents' });

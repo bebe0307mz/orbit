@@ -8,6 +8,8 @@ export interface ApiConfig {
   rpcUrl: string;
   rpcFallbackUrl: string | null;
   syncIntervalMs: number;
+  /** sync interval while payments are moving */
+  syncFastMs: number;
   staleMs: number;
   dbPath: string;
   guardianKeyFile: string | null;
@@ -39,6 +41,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ApiConfig {
     rpcUrl,
     rpcFallbackUrl: env.RPC_FALLBACK_URL || null,
     syncIntervalMs: num(env.SYNC_INTERVAL_MS, 3000),
+    syncFastMs: num(env.SYNC_FAST_MS, 1000),
     staleMs: num(env.STALE_MS, 15000),
     dbPath: env.DB_PATH ?? `./data/orbit-${network}.sqlite`,
     guardianKeyFile: env.GUARDIAN_KEY_FILE || null,

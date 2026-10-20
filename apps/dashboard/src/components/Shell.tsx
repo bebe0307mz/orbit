@@ -76,7 +76,7 @@ export function Shell({ screen }: { screen: Screen }) {
         </span>
         {source.kind === 'mock' ? (
           <span className="tag sample" data-testid="sample-badge" title="Mock source: seeded sample data, chain steps simulated">
-            Sample<span className="sd"> data</span>
+            Sample<span className="sd">data</span>
           </span>
         ) : null}
       </span>
