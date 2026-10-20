@@ -2,17 +2,17 @@ import { useEffect, useRef } from 'react';
 import {
   agentBinding, cmdResumeAgent, cmdRevokeAgent, cmdSetAgentLimits, fmtUsd, hhmm, keyShort, orgRemaining, reasonLabel, toBig,
 } from '@orbit/vault-types';
-import { Cmd, CopyButton, Dot, Meter, useFocusTrap } from '../components/common';
+import { Cmd, CopyButton, Dot, Meter, maxDecimals, padTo, useFocusTrap } from '../components/common';
 import { useStore } from '../lib/store';
 import { hrefFor } from '../lib/route';
 import { useAgentRecent } from '../lib/history';
 
-function TxRow({ merchant, name, st, amount, dead }: { merchant: string; name: string | null; st: React.ReactNode; amount: string; dead?: boolean }) {
+function TxRow({ merchant, name, st, amount, dead, dec = 2 }: { merchant: string; name: string | null; st: React.ReactNode; amount: string; dead?: boolean; dec?: number }) {
   return (
     <div className="tx1">
       <span className={'m' + (name ? '' : ' mono')}>{name ?? merchant}</span>
       <span className="st2">{st}</span>
-      <span className={'amt num' + (dead ? ' strike' : '')}>{fmtUsd(amount)}</span>
+      <span className={'amt num' + (dead ? ' strike' : '')} {...padTo(fmtUsd(amount), dec)}>{fmtUsd(amount)}</span>
     </div>
   );
 }
@@ -48,6 +48,8 @@ export function AgentPanel({ id, onClose, onPause }: { id: number; onClose: () =
   const allBusy = !!ops.all && ops.all.phase !== 'failed' && ops.all.phase !== 'unresolved';
   const b = agentBinding(a, s.org, s.vault.available);
   const orgLeft = orgRemaining(s.org);
+  const kvDec = maxDecimals([a.daily_limit, a.per_payment_limit, s.org.daily_limit, s.vault.available].map((x) => fmtUsd(x)));
+  const txDec = maxDecimals([...pend, ...mine].map((x) => fmtUsd(x.amount)));
   const sub = `Agent ${a.id} · ` + (a.status === 'revoked' ? 'Revoked · key deleted' : a.status === 'paused' ? 'Paused' : 'Active');
 
   return (
@@ -98,13 +100,13 @@ export function AgentPanel({ id, onClose, onPause }: { id: number; onClose: () =
           <div className="section-label">Limits</div>
           <dl className="kv">
             <dt>Daily limit</dt>
-            <dd className="num" data-check={`agent.${a.id}.daily`}>{fmtUsd(a.daily_limit)}</dd>
+            <dd className="num" data-check={`agent.${a.id}.daily`}><span className="num" {...padTo(fmtUsd(a.daily_limit), kvDec)}>{fmtUsd(a.daily_limit)}</span></dd>
             <dt>Per payment</dt>
-            <dd className="num" data-check={`agent.${a.id}.per`}>{fmtUsd(a.per_payment_limit)}</dd>
+            <dd className="num" data-check={`agent.${a.id}.per`}><span className="num" {...padTo(fmtUsd(a.per_payment_limit), kvDec)}>{fmtUsd(a.per_payment_limit)}</span></dd>
             <dt>Org daily limit</dt>
-            <dd className="num"><span className="from" data-check="org.left">{fmtUsd(orgLeft)} left</span><span data-check="org.limit">{fmtUsd(s.org.daily_limit)}</span></dd>
+            <dd className="num"><span className="from" data-check="org.left">{fmtUsd(orgLeft)} left</span><span className="num" data-check="org.limit" {...padTo(fmtUsd(s.org.daily_limit), kvDec)}>{fmtUsd(s.org.daily_limit)}</span></dd>
             <dt>Vault available</dt>
-            <dd className="num" data-check="vault.available">{fmtUsd(s.vault.available)}</dd>
+            <dd className="num" data-check="vault.available"><span className="num" {...padTo(fmtUsd(s.vault.available), kvDec)}>{fmtUsd(s.vault.available)}</span></dd>
           </dl>
           {a.status !== 'revoked' ? (
             <div className="owner-act gap">
@@ -150,7 +152,7 @@ export function AgentPanel({ id, onClose, onPause }: { id: number; onClose: () =
           <div className="section-label">Recent payments</div>
           {!pend.length && !mine.length ? <div className="muted" style={{ fontSize: 13 }}>No payments yet</div> : null}
           {pend.map((p) => (
-            <TxRow key={'p' + p.payment_id} merchant={p.merchant} name={merchantName(p.merchant)} amount={p.amount} st={<span className="op waiting"><span className="dot" />Pending</span>} />
+            <TxRow key={'p' + p.payment_id} merchant={p.merchant} name={merchantName(p.merchant)} amount={p.amount} dec={txDec} st={<span className="op waiting"><span className="dot" />Pending</span>} />
           ))}
           {mine.map((o) => (
             <TxRow
@@ -158,6 +160,7 @@ export function AgentPanel({ id, onClose, onPause }: { id: number; onClose: () =
               merchant={o.merchant}
               name={merchantName(o.merchant)}
               amount={o.amount}
+              dec={txDec}
               dead={o.kind !== 'paid'}
               st={
                 o.kind === 'paid' ? (

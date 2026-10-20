@@ -1,6 +1,6 @@
 // services/api configuration, all from env (docs 4-data-api.md 4.8). Secrets never have defaults.
 import { resolve } from 'node:path';
-import type { Network } from '@orbit/vault-types';
+import { DEFAULT_RPC, type Network } from '@orbit/vault-types';
 
 export interface ApiConfig {
   network: Network;
@@ -33,13 +33,13 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ApiConfig {
   if (network !== 'mainnet' && network !== 'testnet') throw new Error(`NEAR_NETWORK must be mainnet or testnet, got ${network}`);
   const vaultAccount = env.VAULT_ACCOUNT ?? env.VAULT_ACCOUNT_ID ?? '';
   if (!vaultAccount) throw new Error('VAULT_ACCOUNT (or VAULT_ACCOUNT_ID) is required');
-  const rpcUrl = env.RPC_URL ?? env.NEAR_RPC_URL ?? (network === 'mainnet' ? 'https://rpc.mainnet.near.org' : 'https://rpc.testnet.near.org');
+  const rpcUrl = env.RPC_URL ?? env.NEAR_RPC_URL?.split(',')[0] ?? DEFAULT_RPC[network][0];
   const publicOrigin = (env.PUBLIC_ORIGIN ?? 'http://localhost:8787').replace(/\/$/, '');
   return {
     network,
     vaultAccount,
     rpcUrl,
-    rpcFallbackUrl: env.RPC_FALLBACK_URL || null,
+    rpcFallbackUrl: env.RPC_FALLBACK_URL || env.NEAR_RPC_URL?.split(',')[1] || (env.RPC_URL || env.NEAR_RPC_URL ? null : DEFAULT_RPC[network][1]),
     syncIntervalMs: num(env.SYNC_INTERVAL_MS, 3000),
     syncFastMs: num(env.SYNC_FAST_MS, 1000),
     staleMs: num(env.STALE_MS, 15000),

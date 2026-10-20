@@ -23,6 +23,12 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .mono { font-family: var(--mono); font-size: 12px; line-height: 16px; font-feature-settings: "zero"; }
 .num { font-variant-numeric: tabular-nums slashed-zero; font-feature-settings: "tnum", "zero"; white-space: nowrap; }
 .muted { color: var(--muted); }
+/* invisible trailing digits so mixed-precision amounts line up on the decimal point (not part of the text) */
+[data-pad]::after { visibility: hidden; }
+[data-pad="1"]::after { content: "0"; }
+[data-pad="2"]::after { content: "00"; }
+[data-pad="3"]::after { content: "000"; }
+[data-pad="4"]::after { content: "0000"; }
 .ink2 { color: var(--ink-2); }
 .warn { color: var(--warn); }
 .danger { color: var(--danger); }

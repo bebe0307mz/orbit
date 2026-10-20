@@ -268,7 +268,22 @@ describe('RPC fallback', () => {
     expect(h.rpc.last_primary_error).toMatch(/INTERNAL_ERROR/);
   });
 
-  it('send_tx is never re-sent to the fallback URL', async () => {
+  it('a deprecated endpoint (-429 on every call) fails over for reads and for the guardian send', async () => {
+    const chain = new FakeChain();
+    const deprecated = (async (url: string, init: RequestInit) => {
+      if (url === 'http://primary') return new Response(JSON.stringify({ jsonrpc: '2.0', error: { code: -429, message: 'WARNING! THIS ENDPOINT IS DEPRECATED! STOP USING IT NOW!' } }), { status: 200 });
+      return chain.fetch(url, init);
+    }) as unknown as typeof fetch;
+    const c = await setup({ chain, fetchImpl: deprecated, env: { RPC_URL: 'http://primary', RPC_FALLBACK_URL: 'http://fallback' } });
+    expect(c.api.guardian.health.ok).toBe(true);
+    expect(((await req(c, '/v1/state')).json as DashboardState).snapshot.rpc_ok).toBe(true);
+    const cookie = await signIn(c);
+    const r = await req(c, '/v1/agents/4/pause', { method: 'POST', body: {}, cookie });
+    expect(r.status).toBe(202);
+    expect(chain.calls.filter((x) => x.method === 'send_tx')).toHaveLength(1);
+  });
+
+  it('send_tx is never re-sent to the fallback URL after an ambiguous error', async () => {
     const chain = new FakeChain();
     const c = await setup({ chain, fetchImpl: failing(chain, /^send_tx$/), env: { RPC_URL: 'http://primary', RPC_FALLBACK_URL: 'http://fallback' } });
     const cookie = await signIn(c);

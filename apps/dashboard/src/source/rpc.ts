@@ -8,7 +8,8 @@ import {
 import { SourceError, type Session, type VaultSource } from './types';
 
 export interface RpcOptions {
-  rpcUrl: string;
+  /** primary first, then fallbacks */
+  rpcUrls: string[];
   vaultAccountId: string;
   network: Network;
   fetchImpl?: typeof fetch;
@@ -29,34 +30,52 @@ function toBase64(s: string): string {
   return btoa(bin);
 }
 
-/** One `call_function` view call. Returns the parsed JSON result and the block it was read at. */
+/** Errors another RPC node may not have: transport, rate limits, deprecation notices, server-side hiccups. */
+const FAILOVER = /^(INTERNAL_ERROR|TIMEOUT_ERROR|UNKNOWN_BLOCK|NO_SYNCED_BLOCKS|NOT_SYNCED_YET|UNAVAILABLE_SHARD)$/;
+
+/**
+ * One `call_function` view call. Tries each URL in order: a transport error, HTTP 429/5xx, a JSON-RPC -429 (rate limit
+ * or the deprecated near.org endpoints) or a transient server error moves on to the next URL. A view panic is final.
+ */
 export async function viewCall<T>(
-  fetchImpl: typeof fetch, rpcUrl: string, accountId: string, method: string, args: object,
+  fetchImpl: typeof fetch, rpcUrls: string | string[], accountId: string, method: string, args: object,
 ): Promise<{ value: T; block_height: number }> {
-  let res: Response;
-  try {
-    res = await fetchImpl(rpcUrl, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        jsonrpc: '2.0', id: 'orbit-dashboard', method: 'query',
-        params: { request_type: 'call_function', finality: 'final', account_id: accountId, method_name: method, args_base64: toBase64(JSON.stringify(args)) },
-      }),
-    });
-  } catch (e) {
-    throw new SourceError('rpc_unreachable', 'NEAR RPC unreachable');
+  const urls = Array.isArray(rpcUrls) ? rpcUrls : [rpcUrls];
+  let last: SourceError = new SourceError('rpc_unreachable', 'NEAR RPC unreachable');
+  for (const url of urls) {
+    let res: Response;
+    try {
+      res = await fetchImpl(url, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0', id: 'orbit-dashboard', method: 'query',
+          params: { request_type: 'call_function', finality: 'final', account_id: accountId, method_name: method, args_base64: toBase64(JSON.stringify(args)) },
+        }),
+      });
+    } catch {
+      last = new SourceError('rpc_unreachable', 'NEAR RPC unreachable');
+      continue;
+    }
+    if (!res.ok) {
+      last = new SourceError('rpc_error', res.status === 429 ? 'NEAR RPC rate limited (429)' : `NEAR RPC returned ${res.status}`, res.status);
+      if (res.status === 429 || res.status >= 500) continue;
+      throw last;
+    }
+    const body = (await res.json()) as { result?: RpcQueryResult; error?: { code?: number; name?: string; cause?: { name?: string }; message?: string; data?: string } };
+    if (body.error) {
+      const cause = body.error.cause?.name || body.error.name || (body.error.code === -429 ? 'rate limited (429)' : 'error');
+      last = new SourceError('rpc_error', `NEAR RPC ${cause}${body.error.data ? ': ' + String(body.error.data).slice(0, 120) : ''}`);
+      if (body.error.code === -429 || FAILOVER.test(cause) || /deprecated|rate/i.test(body.error.message ?? '')) continue;
+      throw last;
+    }
+    const r = body.result;
+    if (!r) throw new SourceError('rpc_error', 'NEAR RPC returned no result');
+    if (r.error) throw new SourceError('view_failed', `View ${method} failed: ${r.error.slice(0, 160)}`);
+    const text = new TextDecoder().decode(Uint8Array.from(r.result ?? []));
+    return { value: JSON.parse(text) as T, block_height: r.block_height };
   }
-  if (!res.ok) throw new SourceError('rpc_error', res.status === 429 ? 'NEAR RPC rate limited (429)' : `NEAR RPC returned ${res.status}`, res.status);
-  const body = (await res.json()) as { result?: RpcQueryResult; error?: { name?: string; cause?: { name?: string }; message?: string; data?: string } };
-  if (body.error) {
-    const cause = body.error.cause?.name || body.error.name || 'error';
-    throw new SourceError('rpc_error', `NEAR RPC ${cause}${body.error.data ? ': ' + String(body.error.data).slice(0, 120) : ''}`);
-  }
-  const r = body.result;
-  if (!r) throw new SourceError('rpc_error', 'NEAR RPC returned no result');
-  if (r.error) throw new SourceError('view_failed', `View ${method} failed: ${r.error.slice(0, 160)}`);
-  const text = new TextDecoder().decode(Uint8Array.from(r.result ?? []));
-  return { value: JSON.parse(text) as T, block_height: r.block_height };
+  throw last;
 }
 
 const toItem = (o: Outcome): OutcomeItem => ({ ...o, tx_hash: null });
@@ -107,7 +126,7 @@ export class RpcSource implements VaultSource {
 
   private view<T>(method: string, args: object) {
     if (!this.opts.vaultAccountId) throw new SourceError('not_configured', 'VITE_VAULT_ACCOUNT_ID is not set');
-    return viewCall<T>(this.fetchImpl, this.opts.rpcUrl, this.opts.vaultAccountId, method, args);
+    return viewCall<T>(this.fetchImpl, this.opts.rpcUrls, this.opts.vaultAccountId, method, args);
   }
 
   /** Read new ring entries up to nextSeq, 100 per call. */

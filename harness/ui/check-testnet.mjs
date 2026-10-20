@@ -11,12 +11,12 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSy
 import { homedir, tmpdir } from 'node:os';
 import { extname, join, normalize } from 'node:path';
 import {
-  EXE, OUT, chromium, root, results, ok, group, checkFigures, noHScroll, copyRules, open, close, shot, text, waitText, use, finish,
+  EXE, OUT, chromium, root, results, ok, group, checkFigures, noHScroll, copyRules, open, close, shot, text, waitText, use, finish, decimalSpread, AMOUNT_COLUMNS,
 } from './lib.mjs';
 
 const VAULT = process.env.TESTNET_VAULT || 'orbit-vault-fkuc.testnet';
-const RPC = process.env.TESTNET_RPC_URL || 'https://rpc.testnet.near.org';
-const RPC_FALLBACK = process.env.TESTNET_RPC_FALLBACK_URL || 'https://test.rpc.fastnear.com';
+const RPC = process.env.TESTNET_RPC_URL || 'https://test.rpc.fastnear.com';
+const RPC_FALLBACK = process.env.TESTNET_RPC_FALLBACK_URL || 'https://rpc.testnet.fastnear.com';
 const KEY_FILE = process.env.GUARDIAN_KEY_FILE || join(homedir(), '.near-credentials/orbit-testnet', VAULT, 'guardian.json');
 const PAUSE_AGENT = process.env.TESTNET_PAUSE_AGENT || '';
 const API_PORT = Number(process.env.TESTNET_API_PORT || 4395);
@@ -83,7 +83,7 @@ const pwHash = execSync(`node ${NODE_TS.join(' ')} src/cli.ts hash-password`, { 
 const distRpc = join(OUT, 'dist-testnet-rpc');
 const distApi = join(OUT, 'dist-testnet-api');
 console.log(`testnet vault ${VAULT} at block ${S0.block_height}; building dashboards`);
-build('rpc', distRpc, { VITE_NETWORK: 'testnet', VITE_NEAR_RPC_URL: RPC, VITE_VAULT_ACCOUNT_ID: VAULT });
+build('rpc', distRpc, { VITE_NETWORK: 'testnet', VITE_NEAR_RPC_URL: `${RPC},${RPC_FALLBACK}`, VITE_VAULT_ACCOUNT_ID: VAULT });
 build('api', distApi, { VITE_NETWORK: 'testnet' });
 
 const ORIGIN = `http://127.0.0.1:${API_PORT}`;
@@ -140,8 +140,15 @@ async function apiChecks() {
   check('guardian startup check: key is exactly FunctionCall pause_agent,pause_all on the vault', h.guardian.ok === true, h.guardian.reason ?? `allowance ${h.guardian.allowance_yocto} yocto`);
   check('guardian public key equals state().guardian_pk', st.guardian_pk === S0.guardian_pk, st.guardian_pk);
   check('/v1/health ok (fresh, counts match)', h.ok === true && h.stale === false, `snapshot age ${h.snapshot_age_ms} ms`);
-  const page = await (await fetch(`${ORIGIN}/v1/activity?limit=100`)).json();
-  check('activity serves every outcome in the ring', page.items.filter((i) => i.status !== 'pending').length === st.counts.next_seq, `${page.items.length} items`);
+  let settled = 0;
+  let pages = 0;
+  for (let before = null; ; pages++) {
+    const page = await (await fetch(`${ORIGIN}/v1/activity?limit=100${before != null ? `&before_seq=${before}` : ''}`)).json();
+    settled += page.items.filter((i) => i.status !== 'pending').length;
+    if (page.next_before_seq == null) break;
+    before = page.next_before_seq;
+  }
+  check('activity serves every outcome in the ring (before_seq cursor to the end)', settled === st.counts.next_seq, `${settled} outcomes in ${pages + 1} pages, next_seq ${st.counts.next_seq}`);
 }
 
 /* ---------- 3. api mode UI ---------- */
@@ -156,6 +163,10 @@ async function apiUi() {
     ok(await p.locator('[data-testid="sample-badge"]').count() === 0, 'no Sample data badge');
     await noHScroll(p, 'agents');
     await copyRules(p, 'agents');
+    if (width >= 1024) {
+      const sp = await decimalSpread(p, AMOUNT_COLUMNS);
+      ok(Object.values(sp).every((v) => v.spread <= 1), `amount columns line up on the decimal point (${Object.entries(sp).map(([k, v]) => `${k} ${v.count} rows ${v.spread.toFixed(1)}px`).join(', ')})`);
+    }
     await shot(p, `testnet-api-agents-${theme}-${width}`);
     await p.click('#tabActivity');
     const want = S0.pending_count + Math.min(25, S0.counts.next_seq);

@@ -4,7 +4,7 @@ import {
   type DashboardState, type OutcomeItem,
 } from '@orbit/vault-types';
 import { Banners, useStale } from '../components/Shell';
-import { CopyButton, Dot, isTypingTarget } from '../components/common';
+import { CopyButton, Dot, isTypingTarget, maxDecimals, padTo } from '../components/common';
 import { useStore } from '../lib/store';
 import { hrefFor, replaceRoute, type Route } from '../lib/route';
 import { useActivityRows } from '../lib/history';
@@ -86,6 +86,7 @@ export function ActivityScreen({ route }: { route: Route }) {
   const [current, setCurrent] = useState<string | null>(null);
   const rows = useActivityRows({ status, agent, merchant });
   const shown = rows.shown;
+  const amtDec = maxDecimals([...rows.pend.map((x) => fmtUsd(x.amount)), ...shown.map((o) => fmtUsd(o.amount))]);
 
   // Live updates: rows that arrive after the first render get a short highlight; when the reader has scrolled down,
   // the first visible row keeps its place on screen while new rows are inserted above it (manual scroll anchoring,
@@ -306,7 +307,7 @@ export function ActivityScreen({ route }: { route: Route }) {
                     <td className="c-time">reserved {hhmmss(x.reserved_at_ms)}</td>
                     <td className="c-agent truncate"><a href={hrefFor('agents', { agent: x.agent_id })} onClick={(e) => e.stopPropagation()}>{agentName(x.agent_id)}</a></td>
                     <td className="c-merch truncate"><Merch acct={x.merchant} s={s} /></td>
-                    <td className="c-amt r num">{fmtUsd(x.amount)}</td>
+                    <td className="c-amt r"><span className="num" {...padTo(fmtUsd(x.amount), amtDec)}>{fmtUsd(x.amount)}</span></td>
                     <td className="c-st"><StatusCell kind="pending" /><span className="t2">· reserved {hhmm(x.reserved_at_ms)}</span></td>
                     <td className="c-reason col-reason" />
                   </tr>
@@ -329,7 +330,7 @@ export function ActivityScreen({ route }: { route: Route }) {
                     <td className="c-time">{timeCell(o.timestamp_ms, s.snapshot.timestamp_ms)}</td>
                     <td className="c-agent truncate"><a href={hrefFor('agents', { agent: o.agent_id })} onClick={(e) => e.stopPropagation()}>{agentName(o.agent_id)}</a></td>
                     <td className="c-merch truncate"><Merch acct={o.merchant} s={s} /></td>
-                    <td className="c-amt r"><span className={'num' + (dead ? ' strike' : '')}>{fmtUsd(o.amount)}</span></td>
+                    <td className="c-amt r"><span className={'num' + (dead ? ' strike' : '')} {...padTo(fmtUsd(o.amount), amtDec)}>{fmtUsd(o.amount)}</span></td>
                     <td className="c-st"><StatusCell kind={o.kind} reason={o.reason} /><span className="t2">· {timeCell(o.timestamp_ms, s.snapshot.timestamp_ms)}</span></td>
                     <td className="c-reason col-reason truncate" title={o.reason ?? undefined}>{reasonLabel(o.reason)}</td>
                   </tr>

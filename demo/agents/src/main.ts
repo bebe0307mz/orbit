@@ -10,7 +10,7 @@ import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { keygen, loadKey, NearRpc } from '@orbit/agent';
-import type { VaultState } from '@orbit/vault-types';
+import { DEFAULT_RPC, type VaultState } from '@orbit/vault-types';
 import { JOBS } from './policy.ts';
 import { runAgents } from './run.ts';
 import { proveRun } from './proof.ts';
@@ -28,7 +28,7 @@ const opt = (n: string) => (args.includes(`--${n}`) ? args[args.indexOf(`--${n}`
 
 const network = env('NEAR_NETWORK', 'testnet') as 'testnet' | 'mainnet';
 const vault = env('VAULT_ACCOUNT_ID');
-const rpcUrls = env('NEAR_RPC_URL', network === 'mainnet' ? 'https://rpc.mainnet.near.org' : 'https://rpc.testnet.near.org').split(',');
+const rpcUrls = env('NEAR_RPC_URL', DEFAULT_RPC[network].join(',')).split(',');
 const keyDir = process.env.DEMO_KEY_DIR || join(homedir(), '.near-credentials', `orbit-${network}`, vault);
 const keyFile = (name: string) => join(keyDir, `demo-${name}.json`);
 const DAILY = '1.00';

@@ -136,3 +136,36 @@ export function finish(file, extra = {}) {
   writeFileSync(join(OUT, file), JSON.stringify({ at: new Date().toISOString(), passed: results.length - failed.length, failed: failed.length, results, ...extra }, null, 2));
   return failed.length ? 1 : 0;
 }
+
+/**
+ * Decimal-point alignment: for each selector (a column of amount elements), the x position of the '.' glyph in every
+ * visible element. Returns {selector: {count, spread}} where spread is max - min in px (0 means perfectly aligned).
+ */
+export async function decimalSpread(page, selectors) {
+  return page.evaluate((sels) => {
+    const out = {};
+    for (const sel of sels) {
+      const xs = [];
+      for (const el of document.querySelectorAll(sel)) {
+        if (!el.offsetParent) continue;
+        const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+        for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+          const i = n.textContent.indexOf('.');
+          if (i < 0 || !/\$/.test(el.textContent)) continue;
+          const r = document.createRange();
+          r.setStart(n, i);
+          r.setEnd(n, i + 1);
+          xs.push(r.getBoundingClientRect().left);
+          break;
+        }
+      }
+      out[sel] = { count: xs.length, spread: xs.length ? Math.max(...xs) - Math.min(...xs) : 0 };
+    }
+    return out;
+  }, selectors);
+}
+
+/** Left edges of the header figures (they must not move between updates). */
+export const figureLefts = (page) => page.$$eval('.figs .fig', (f) => f.map((x) => Math.round(x.getBoundingClientRect().left)).join(','));
+
+export const AMOUNT_COLUMNS = ['td.c-spent', 'td.c-daily', 'td.c-per', 'td.c-rem .num'];

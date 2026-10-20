@@ -101,3 +101,20 @@ export function Live({ children }: { children: ReactNode }) {
 }
 
 export const isTypingTarget = (el: Element | null) => !!el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName);
+
+/** Digits after the decimal point in a formatted amount ("$0.25" -> 2, "$0.001" -> 3). */
+export const decimalsOf = (text: string) => {
+  const i = text.indexOf('.');
+  return i < 0 ? 0 : text.length - i - 1;
+};
+
+/**
+ * Invisible trailing digits so a right-aligned column of mixed precision ($0.25, $0.001) lines up on the decimal
+ * point. Rendered by CSS (::after), so text, copy and checks see the exact value only.
+ */
+export const padTo = (text: string, max: number): { 'data-pad'?: number } => {
+  const n = Math.min(4, Math.max(0, max - decimalsOf(text)));
+  return n ? { 'data-pad': n } : {};
+};
+
+export const maxDecimals = (texts: string[]) => texts.reduce((m, t) => Math.max(m, decimalsOf(t)), 2);

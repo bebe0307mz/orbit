@@ -83,15 +83,19 @@ export class NearRpc {
       }
       if (!res.ok) {
         last = fail(new RpcError(`HTTP_${res.status}`, res.status === 429 ? 'NEAR RPC rate limited (429)' : `NEAR RPC returned ${res.status}`));
-        if (res.status === 429 || res.status >= 500) continue;
+        // reads fail over on any 429/5xx; a send only on an explicit refusal (it was not accepted), never on 502/504
+        if (write ? res.status === 429 || res.status === 503 : res.status === 429 || res.status >= 500) continue;
         throw last;
       }
-      const body = (await res.json()) as { result?: T; error?: { name?: string; message?: string; cause?: { name?: string; info?: unknown }; data?: unknown } };
+      const body = (await res.json()) as { result?: T; error?: { code?: number; name?: string; message?: string; cause?: { name?: string; info?: unknown }; data?: unknown } };
       if (body.error) {
         const code = errorCode(body.error);
         const err = new RpcError(code, `NEAR RPC ${code}${typeof body.error.data === 'string' ? ': ' + body.error.data.slice(0, 200) : ''}`, body.error.data ?? body.error.cause);
-        if (!write && TRANSIENT.test(code) && i < this.urls.length - 1) {
-          last = fail(err);
+        // -429: rate limited, or a deprecated endpoint (rpc.*.near.org answer this to every call). The request was
+        // refused, not executed, so even a send may go to the next URL (identical signed bytes, same hash and nonce).
+        const refused = body.error.code === -429 || /deprecated|rate limit/i.test(body.error.message ?? '');
+        if ((refused || (!write && TRANSIENT.test(code))) && i < this.urls.length - 1) {
+          last = fail(refused ? new RpcError('RATE_LIMITED', `NEAR RPC refused: ${(body.error.message ?? '').slice(0, 80)}`) : err);
           continue;
         }
         throw err;

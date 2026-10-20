@@ -12,7 +12,7 @@ const SCENARIOS: MockScenario[] = ['normal', 'loading', 'empty', 'stale', 'rpcer
 export function createSource(search: string = window.location.search): VaultSource {
   if (config.source === 'api') return new ApiSource({ network: config.network, baseUrl: config.apiUrl });
   if (config.source === 'rpc') {
-    return new RpcSource({ rpcUrl: config.rpcUrl, vaultAccountId: config.vaultAccountId, network: config.network });
+    return new RpcSource({ rpcUrls: config.rpcUrls, vaultAccountId: config.vaultAccountId, network: config.network });
   }
   const p = new URLSearchParams(search);
   const st = p.get('state') as MockScenario | null;

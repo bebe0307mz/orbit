@@ -155,7 +155,7 @@ const okHandler: Handler = (method, args) => {
 };
 
 describe('RpcSource', () => {
-  const opts = { rpcUrl: 'https://rpc.test', vaultAccountId: 'orbit-vault.orbit-team.near', network: 'mainnet' as const };
+  const opts = { rpcUrls: ['https://rpc.test'], vaultAccountId: 'orbit-vault.orbit-team.near', network: 'mainnet' as const };
 
   it('maps state() plus the ring into the dashboard shape, consistent with the history', async () => {
     const { f, calls } = fakeRpc(okHandler);
@@ -197,6 +197,20 @@ describe('RpcSource', () => {
     await expect(new RpcSource({ ...opts, fetchImpl: f }).getState()).rejects.toThrow('NEAR RPC rate limited (429)');
     const { f: g } = fakeRpc(() => ({ body: { jsonrpc: '2.0', id: 'x', result: { error: 'wasm execution failed with error: MethodNotFound', block_height: 1, block_hash: 'h' } } }));
     await expect(new RpcSource({ ...opts, fetchImpl: g }).getState()).rejects.toThrow('View state failed');
+  });
+
+  it('fails over to the next URL on a JSON-RPC -429 (deprecated near.org endpoints) and on transient errors', async () => {
+    const good = fakeRpc(okHandler).f;
+    const deprecated = (async () => new Response(JSON.stringify({ jsonrpc: '2.0', error: { code: -429, message: 'WARNING! THIS ENDPOINT IS DEPRECATED! STOP USING IT NOW!' } }), { status: 200 })) as unknown as typeof fetch;
+    const routed = ((url: string, init: RequestInit) => (url === 'https://old' ? deprecated(url, init) : good(url, init))) as unknown as typeof fetch;
+    const src = new RpcSource({ ...opts, rpcUrls: ['https://old', 'https://new'], fetchImpl: routed });
+    expect((await src.getState()).org.remaining_today).toBe('2620000');
+    // a deterministic error (view panic) is not retried elsewhere
+    const { f: panicky } = fakeRpc(() => ({ body: { jsonrpc: '2.0', id: 'x', result: { error: 'wasm execution failed', block_height: 1, block_hash: 'h' } } }));
+    let calls = 0;
+    const counted = ((u: string, i: RequestInit) => (calls++, panicky(u, i))) as unknown as typeof fetch;
+    await expect(new RpcSource({ ...opts, rpcUrls: ['https://a', 'https://b'], fetchImpl: counted }).getState()).rejects.toThrow('View state failed');
+    expect(calls).toBe(1);
   });
 
   it('pause is not connected until services/api exists, and there is no session', async () => {

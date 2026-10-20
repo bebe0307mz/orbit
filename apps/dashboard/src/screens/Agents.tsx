@@ -4,7 +4,7 @@ import {
   type ApiAgent, type DashboardState,
 } from '@orbit/vault-types';
 import { Banners, useStale } from '../components/Shell';
-import { Cmd, Dot, Meter, isTypingTarget } from '../components/common';
+import { Cmd, Dot, Meter, isTypingTarget, maxDecimals, padTo } from '../components/common';
 import { useNow, useStore, type OpEntry } from '../lib/store';
 import { replaceRoute, type Route } from '../lib/route';
 import { AgentPanel } from './AgentPanel';
@@ -31,7 +31,7 @@ export function StatusCell({ a, s, op }: { a: ApiAgent; s: DashboardState; op?: 
   return <span className="status s-active">Active</span>;
 }
 
-function RemCell({ a, s }: { a: ApiAgent; s: DashboardState }) {
+function RemCell({ a, s, dec }: { a: ApiAgent; s: DashboardState; dec: number }) {
   const lbl = a.status === 'revoked' ? 'Revoked' : a.status === 'paused' ? 'Paused' : s.org.paused ? 'Org paused' : null;
   if (lbl) {
     return (
@@ -44,7 +44,7 @@ function RemCell({ a, s }: { a: ApiAgent; s: DashboardState }) {
   const b = agentBinding(a, s.org, s.vault.available);
   return (
     <span className="rem">
-      <span className="num" data-check={`agent.${a.id}.remaining`}>{fmtUsd(a.remaining_today)}</span>
+      <span className="num" data-check={`agent.${a.id}.remaining`} {...padTo(fmtUsd(a.remaining_today), dec)}>{fmtUsd(a.remaining_today)}</span>
       <span className="bind">{b === 'org' ? 'org limit' : b === 'vault' ? 'vault' : ''}</span>
     </span>
   );
@@ -52,28 +52,30 @@ function RemCell({ a, s }: { a: ApiAgent; s: DashboardState }) {
 
 function Figures({ s }: { s: DashboardState }) {
   const v = s.vault;
+  // reserve each figure's width for its largest possible value at three decimals, so updates never shift the row
+  const room = (max: string) => ({ minWidth: `${fmtUsd(max).length + 1}ch` });
   return (
     <div className="figs">
       <div className="fig">
         <div className="l">Vault balance</div>
-        <div className="v num" data-check="vault.balance">{fmtUsd(vaultBalance(v))}</div>
+        <div className="v num" style={room(v.float_cap)} data-check="vault.balance">{fmtUsd(vaultBalance(v))}</div>
         <div className="s">of <span data-check="vault.cap">{fmtUsd(v.float_cap)}</span> float cap</div>
       </div>
       <div className="fig">
         <div className="l">Spent today</div>
-        <div className="v num" data-check="org.spent">{fmtUsd(s.org.spent_today)}</div>
+        <div className="v num" style={room(s.org.daily_limit)} data-check="org.spent">{fmtUsd(s.org.spent_today)}</div>
         <div className="s">of <span data-check="org.limit">{fmtUsd(s.org.daily_limit)}</span> org daily limit</div>
         <Meter value={toBig(s.org.spent_today)} max={toBig(s.org.daily_limit)} label="Org spent today against the org daily limit" />
       </div>
       <div className="fig">
         <div className="l">Remaining today</div>
-        <div className="v num" data-check="org.remaining">{s.org.paused ? 'Org paused' : fmtUsd(orgRemainingShown(s.org, v.available))}</div>
+        <div className="v num" style={room(s.org.daily_limit)} data-check="org.remaining">{s.org.paused ? 'Org paused' : fmtUsd(orgRemainingShown(s.org, v.available))}</div>
         <div className="s">{vaultBindsOrg(s.org, v.available) ? 'limited by vault balance' : 'Resets 00:00 UTC'}</div>
       </div>
       {s.pending_count > 0 ? (
         <div className="fig">
           <div className="l">In flight</div>
-          <div className="v num" data-check="inflight">{fmtUsd(s.org.reserved)}</div>
+          <div className="v num" style={room(s.org.daily_limit)} data-check="inflight">{fmtUsd(s.org.reserved)}</div>
           <div className="s"><span data-check="inflight.n">{s.pending_count}</span> payment{s.pending_count === 1 ? '' : 's'}</div>
         </div>
       ) : null}
@@ -277,6 +279,13 @@ export function AgentsScreen({ route }: { route: Route }) {
   } else if (!s) {
     body = <Skeleton head={head(null)} />;
   } else {
+    // per-column precision: every value keeps its exact decimals; shorter ones are padded so points line up
+    const dec = {
+      spent: maxDecimals([...s.agents.map((a) => fmtUsd(a.spent_today)), fmtUsd(s.org.spent_today)]),
+      daily: maxDecimals(s.agents.map((a) => fmtUsd(a.daily_limit))),
+      per: maxDecimals(s.agents.map((a) => fmtUsd(a.per_payment_limit))),
+      rem: maxDecimals(s.agents.filter((a) => a.status === 'active' && !s.org.paused).map((a) => fmtUsd(a.remaining_today))),
+    };
     const paused = s.agents.filter((a) => a.status === 'paused').length;
     const revoked = s.agents.filter((a) => a.status === 'revoked').length;
     const th = (k: SortKey, label: string, cls: string) => (
@@ -358,10 +367,10 @@ export function AgentsScreen({ route }: { route: Route }) {
                             <span className="id">#{a.id}</span>
                           </td>
                           <td className="c-status"><StatusCell a={a} s={s} op={op} /></td>
-                          <td className="c-spent r num" data-check={`agent.${a.id}.spent`}>{fmtUsd(a.spent_today)}</td>
-                          <td className="c-daily r num col-daily" data-check={`agent.${a.id}.daily`}>{fmtUsd(a.daily_limit)}</td>
-                          <td className="c-per r num col-per" data-check={`agent.${a.id}.per`}>{fmtUsd(a.per_payment_limit)}</td>
-                          <td className="c-rem r"><RemCell a={a} s={s} /></td>
+                          <td className="c-spent r num" data-check={`agent.${a.id}.spent`} {...padTo(fmtUsd(a.spent_today), dec.spent)}>{fmtUsd(a.spent_today)}</td>
+                          <td className="c-daily r num col-daily" data-check={`agent.${a.id}.daily`} {...padTo(fmtUsd(a.daily_limit), dec.daily)}>{fmtUsd(a.daily_limit)}</td>
+                          <td className="c-per r num col-per" data-check={`agent.${a.id}.per`} {...padTo(fmtUsd(a.per_payment_limit), dec.per)}>{fmtUsd(a.per_payment_limit)}</td>
+                          <td className="c-rem r"><RemCell a={a} s={s} dec={dec.rem} /></td>
                           <td className="c-last col-last muted">{a.last_paid_ms ? ago(a.last_paid_ms, now) : 'None'}</td>
                           <td className="c-of"><span className="num">{fmtUsd(a.spent_today)}</span> of {fmtUsd(a.daily_limit)}</td>
                           <td className="c-act">
@@ -380,7 +389,7 @@ export function AgentsScreen({ route }: { route: Route }) {
                       <td className="foot-n" colSpan={2}>
                         {s.agents.length} agents{paused ? ` · ${paused} paused` : ''}{revoked ? ` · ${revoked} revoked` : ''}
                       </td>
-                      <td className="r num foot-s"><span data-check="agents.spent">{fmtUsd(s.org.spent_today)}</span></td>
+                      <td className="r num foot-s"><span className="num" data-check="agents.spent" {...padTo(fmtUsd(s.org.spent_today), dec.spent)}>{fmtUsd(s.org.spent_today)}</span></td>
                       <td className="col-daily" /><td className="col-per" /><td /><td className="col-last" /><td />
                     </tr>
                   </tfoot>

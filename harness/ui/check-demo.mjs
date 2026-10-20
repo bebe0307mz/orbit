@@ -7,10 +7,10 @@ import { createServer } from 'node:http';
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { EXE, OUT, chromium, root, results, ok, group, checkFigures, noHScroll, open, close, shot, text, use, finish } from './lib.mjs';
+import { EXE, OUT, chromium, root, results, ok, group, checkFigures, noHScroll, open, close, shot, text, use, finish, decimalSpread, figureLefts, AMOUNT_COLUMNS } from './lib.mjs';
 
 const VAULT = process.env.VAULT_ACCOUNT_ID || 'orbit-vault-fkuc.testnet';
-const RPC = process.env.NEAR_RPC_URL || 'https://rpc.testnet.near.org,https://test.rpc.fastnear.com';
+const RPC = process.env.NEAR_RPC_URL || 'https://test.rpc.fastnear.com,https://rpc.testnet.fastnear.com';
 const MERCHANT = process.env.MERCHANT_ACCOUNT_ID || 'orbit-merchant-fkuc.testnet';
 const TOKEN = process.env.TOKEN_ACCOUNT_ID || 'orbit-token-fkuc.testnet';
 const KEY_FILE = process.env.GUARDIAN_KEY_FILE || join(homedir(), '.near-credentials/orbit-testnet', VAULT, 'guardian.json');
@@ -113,7 +113,7 @@ await live.panel.page.waitForSelector('#panel .tx1', { timeout: 30000 }).catch((
 await live.scrolled.page.evaluate(() => window.scrollTo(0, 420));
 await live.scrolled.page.waitForTimeout(300);
 for (const o of Object.values(live)) await o.page.evaluate(() => { window.__noReload = true; });
-const L = { samples: 0, topKeys: new Set(), topFirst: [], rowsStart: 0, rowsMax: 0, anchorDrift: 0, anchorChecks: 0, scrollYStart: 0, scrollYEnd: 0, fresh: 0, inflightSeen: 0, inflightShot: false, freshShot: false, panelFirst: new Set(), reloads: 0 };
+const L = { figLefts: new Set(), spread: {}, samples: 0, topKeys: new Set(), topFirst: [], rowsStart: 0, rowsMax: 0, anchorDrift: 0, anchorChecks: 0, scrollYStart: 0, scrollYEnd: 0, fresh: 0, inflightSeen: 0, inflightShot: false, freshShot: false, panelFirst: new Set(), reloads: 0 };
 L.rowsStart = await live.top.page.$$eval('tr.row', (r) => r.length);
 L.scrollYStart = await live.scrolled.page.evaluate(() => window.scrollY);
 const anchorKey = await live.scrolled.page.evaluate(() => {
@@ -143,6 +143,8 @@ const sampleLoop = (async () => {
         if (!L.inflightShot) { L.inflightShot = true; await shot(live.panel.page, 'demo-live-inflight-light'); }
       }
       if (pnl.first) L.panelFirst.add(pnl.first);
+      L.figLefts.add((await figureLefts(live.panel.page)).split(',').slice(0, 3).join(',')); // In flight (4th) comes and goes
+      for (const [k, v] of Object.entries(await decimalSpread(live.panel.page, AMOUNT_COLUMNS))) L.spread[k] = Math.max(L.spread[k] ?? 0, v.count > 1 ? v.spread : 0);
       if (!pnl.ok) L.reloads++;
     } catch {}
     await new Promise((r) => setTimeout(r, 500));
@@ -212,6 +214,8 @@ try {
   uiOk('scrolled Activity keeps its place while rows arrive above (anchor drift <= 2 px)', !!anchorKey && L.anchorChecks > 0 && L.anchorDrift <= 2 && L.scrollYEnd > L.scrollYStart, anchorKey ? `drift ${L.anchorDrift.toFixed(1)} px over ${L.anchorChecks} checks, scrollY ${L.scrollYStart} -> ${L.scrollYEnd}` : 'no anchor row');
   uiOk('rows that arrive live are highlighted briefly and still lay out as table rows', L.fresh > 0 && !L.broken, `${L.fresh} highlighted row samples, ${L.broken ?? 0} rows not display:table-row`);
   uiOk('price-watcher panel recent payments update live', L.panelFirst.size > 1, `${L.panelFirst.size} different newest rows`);
+  uiOk('header figures keep their place while values change (no width shift)', L.figLefts.size === 1, `left edges ${[...L.figLefts].join(' | ')}`);
+  uiOk('Agents amount columns line up on the decimal point (mixed 2 and 3 decimals)', Object.values(L.spread).every((v) => v <= 1), Object.entries(L.spread).map(([k, v]) => `${k} ${v.toFixed(1)}px`).join(', '));
   uiOk('In flight figure shows while payments are pending', L.inflightSeen > 0, `${L.inflightSeen} of ${L.samples} samples`);
   for (const o of Object.values(live)) await close(o, 'live page');
   for (const theme of ['dark', 'light']) {
