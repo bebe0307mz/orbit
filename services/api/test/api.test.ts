@@ -239,7 +239,11 @@ describe('auth', () => {
     const noCookie = await req(c, '/v1/agents/2/pause', { method: 'POST', body: {} });
     expect(noCookie.status).toBe(401);
     expect(noCookie.json.error.code).toBe('unauthenticated');
-    const forged = cookie.replace(/.$/, (ch) => (ch === 'A' ? 'B' : 'A'));
+    // tamper a character that carries MAC bits (the middle of the MAC), never only padding bits
+    const [name, value] = cookie.split('=') as [string, string];
+    const [payload, mac] = value.split('.') as [string, string];
+    const i = Math.floor(mac.length / 2);
+    const forged = `${name}=${payload}.${mac.slice(0, i)}${mac[i] === 'A' ? 'B' : 'A'}${mac.slice(i + 1)}`;
     expect((await req(c, '/v1/pause-all', { method: 'POST', body: {}, cookie: forged })).status).toBe(401);
     expect(c.chain.calls.some((x) => x.method === 'send_tx')).toBe(false);
   });
@@ -254,6 +258,13 @@ describe('auth', () => {
 
   it('cookie primitives: expiry and tampering', () => {
     const s = issueSession(SECRET, 1000, 0);
+    // regression: a cookie whose MAC differs only in base64url padding bits decodes to the same MAC; refuse it
+    const [p, mac] = s.value.split('.') as [string, string];
+    const last = mac[mac.length - 1]!;
+    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+    const twin = alphabet[alphabet.indexOf(last) ^ 1]!; // flips the lowest bit: unused for a 32-byte MAC
+    expect(Buffer.from(mac.slice(0, -1) + twin, 'base64url').equals(Buffer.from(mac, 'base64url'))).toBe(true);
+    expect(verifySession(SECRET, `${p}.${mac.slice(0, -1)}${twin}`, 500)).toBeNull();
     expect(verifySession(SECRET, s.value, 500)?.sid).toBe(s.sid);
     expect(verifySession(SECRET, s.value, 1000)).toBeNull();
     expect(verifySession('other', s.value, 500)).toBeNull();

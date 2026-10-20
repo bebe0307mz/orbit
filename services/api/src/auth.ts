@@ -41,7 +41,9 @@ export function verifySession(secret: string, value: string | undefined, now: nu
   const payload = Buffer.from(p, 'base64url').toString('utf8');
   const want = createHmac('sha256', secret).update(payload).digest();
   const got = Buffer.from(mac, 'base64url');
-  if (got.length !== want.length || !timingSafeEqual(got, want)) return null;
+  // only the canonical encoding is accepted: base64url's unused padding bits would otherwise let several strings
+  // decode to the same MAC (cookie malleability)
+  if (got.length !== want.length || got.toString('base64url') !== mac || !timingSafeEqual(got, want)) return null;
   const m = payload.match(/^([0-9a-f]{32})\.(\d+)$/);
   if (!m) return null;
   const exp = Number(m[2]);
