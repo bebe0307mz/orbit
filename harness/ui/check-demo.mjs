@@ -1,0 +1,146 @@
+// Demo agents on testnet, end to end (opt-in: spends test tokens): starts services/merchant and services/api (serving
+// a VITE_SOURCE=api dashboard), runs `demo:agents run --proof` for DEMO_MINUTES, then checks the dashboard:
+// Activity lists the agents' paid rows, figures equal /v1/state, screenshots in both themes. The UI checks are
+// appended to the run's proof (harness/out/testnet-agents-<utc>/summary.json). Child processes are stopped by pid.
+import { execSync, spawn } from 'node:child_process';
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
+import { EXE, OUT, chromium, root, results, ok, group, checkFigures, noHScroll, open, close, shot, text, use, finish } from './lib.mjs';
+
+const VAULT = process.env.VAULT_ACCOUNT_ID || 'orbit-vault-fkuc.testnet';
+const RPC = process.env.NEAR_RPC_URL || 'https://rpc.testnet.near.org,https://test.rpc.fastnear.com';
+const MERCHANT = process.env.MERCHANT_ACCOUNT_ID || 'orbit-merchant-fkuc.testnet';
+const TOKEN = process.env.TOKEN_ACCOUNT_ID || 'orbit-token-fkuc.testnet';
+const KEY_FILE = process.env.GUARDIAN_KEY_FILE || join(homedir(), '.near-credentials/orbit-testnet', VAULT, 'guardian.json');
+const MINUTES = process.env.DEMO_MINUTES || '4';
+const API_PORT = 4397;
+const MERCHANT_PORT = 4398;
+const NODE_TS = ['--experimental-strip-types', '--no-warnings=ExperimentalWarning'];
+const work = join(OUT, '..', 'demo-run');
+mkdirSync(work, { recursive: true });
+const children = [];
+const spawnLogged = (name, cmd, args, opts) => {
+  const p = spawn(cmd, args, opts);
+  children.push(p);
+  let buf = '';
+  p.stdout.on('data', (d) => (buf += d));
+  p.stderr.on('data', (d) => (buf += d));
+  p.logs = () => buf;
+  return p;
+};
+const waitFor = async (url, ms = 60000) => {
+  const t = Date.now();
+  while (Date.now() - t < ms) {
+    try { if ((await fetch(url)).ok) return; } catch {}
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  throw new Error(`${url} not up`);
+};
+const stopAll = () => { for (const p of children) if (p.exitCode == null) try { process.kill(p.pid, 'SIGTERM'); } catch {} };
+process.on('exit', stopAll);
+
+const password = 'demo-run-' + Math.random().toString(36).slice(2);
+const pwHash = execSync(`node ${NODE_TS.join(' ')} src/cli.ts hash-password`, { cwd: join(root, 'services/api'), input: password }).toString().trim();
+const distApi = join(OUT, 'dist-demo-api');
+execSync(`pnpm exec vite build --outDir ${distApi} --emptyOutDir --logLevel warn`, { cwd: join(root, 'apps/dashboard'), stdio: 'inherit', env: { ...process.env, VITE_SOURCE: 'api', VITE_NETWORK: 'testnet' } });
+
+const ORIGIN = `http://127.0.0.1:${API_PORT}`;
+const api = spawnLogged('api', 'node', [...NODE_TS, 'src/main.ts'], {
+  cwd: join(root, 'services/api'),
+  env: { ...process.env, NEAR_NETWORK: 'testnet', VAULT_ACCOUNT: VAULT, RPC_URL: RPC.split(',')[0], RPC_FALLBACK_URL: RPC.split(',')[1] ?? '', DB_PATH: join(work, 'api.sqlite'), GUARDIAN_KEY_FILE: KEY_FILE, OPERATOR_PASSWORD_HASH: pwHash, SESSION_SECRET: 'demo-' + Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2), PUBLIC_ORIGIN: ORIGIN, PORT: String(API_PORT), HOST: '127.0.0.1', DASHBOARD_DIR: distApi },
+});
+// services/merchant uses TypeScript parameter properties, which strip-only mode rejects
+const merchant = spawnLogged('merchant', 'node', ['--experimental-transform-types', '--no-warnings=ExperimentalWarning', 'src/main.ts'], {
+  cwd: join(root, 'services/merchant'),
+  env: { ...process.env, NEAR_NETWORK: 'testnet', VAULT_ACCOUNT_ID: VAULT, MERCHANT_ACCOUNT_ID: MERCHANT, TOKEN_ACCOUNT_ID: TOKEN, NEAR_RPC_URL: RPC, MERCHANT_DB: join(work, 'merchant.sqlite'), MERCHANT_PORT: String(MERCHANT_PORT), API_URL: ORIGIN },
+});
+try {
+  await waitFor(`${ORIGIN}/v1/state`);
+  await waitFor(`http://127.0.0.1:${MERCHANT_PORT}/health`);
+} catch (e) {
+  console.error(`${e.message}\n--- api\n${api.logs().slice(-3000)}\n--- merchant\n${merchant.logs().slice(-3000)}`);
+  stopAll();
+  process.exit(1);
+}
+console.log(`merchant and api up; running the agents for ${MINUTES} minutes`);
+
+const before = new Set(readdirSync(join(OUT, '..')).filter((d) => d.startsWith('testnet-agents-')));
+const demoLog = join(work, `agents-${Date.now()}.jsonl`);
+const agents = spawn('node', [...NODE_TS, 'src/main.ts', 'run', '--minutes', MINUTES, '--proof'], {
+  cwd: join(root, 'demo/agents'), stdio: 'inherit',
+  env: { ...process.env, NEAR_NETWORK: 'testnet', VAULT_ACCOUNT_ID: VAULT, NEAR_RPC_URL: RPC, MERCHANT_URL: `http://127.0.0.1:${MERCHANT_PORT}`, MERCHANT_ACCOUNT_ID: MERCHANT, TOKEN_ACCOUNT_ID: TOKEN, ORBIT_API_URL: ORIGIN, DEMO_LOG: demoLog },
+});
+children.push(agents);
+const agentsCode = await new Promise((r) => agents.on('close', r));
+const proofDir = readdirSync(join(OUT, '..')).filter((d) => d.startsWith('testnet-agents-') && !before.has(d)).sort().pop();
+group('demo run');
+ok(agentsCode === 0, `demo:agents run --proof exited ${agentsCode}`);
+ok(!!proofDir, `proof written (${proofDir})`);
+const summaryFile = proofDir ? join(OUT, '..', proofDir, 'summary.json') : null;
+const summary = summaryFile && existsSync(summaryFile) ? JSON.parse(readFileSync(summaryFile, 'utf8')) : null;
+for (const c of summary?.checks ?? []) ok(c.ok, `chain: ${c.check} (${c.detail})`);
+const purchases = proofDir ? JSON.parse(readFileSync(join(OUT, '..', proofDir, 'purchases.json'), 'utf8')) : [];
+const paidIds = new Set(purchases.filter((p) => p.status === 'paid').map((p) => p.payment_id));
+
+/* ---------- dashboard ---------- */
+const uiChecks = [];
+const uiOk = (name, cond, detail = '') => { ok(cond, `${name}${detail ? ` (${detail})` : ''}`); uiChecks.push({ check: name, ok: !!cond, detail: String(detail) }); };
+const apiState = async () => ({ state: await (await fetch(`${ORIGIN}/v1/state`)).json(), outcomes: [] });
+let browser;
+try {
+  // let the syncer catch up with the last outcomes
+  for (let i = 0; i < 20; i++) {
+    const s = await (await fetch(`${ORIGIN}/v1/state`)).json();
+    if (s.sync.last_seq === s.counts.next_seq - 1) break;
+    await new Promise((r) => setTimeout(r, 1500));
+  }
+  const st = await (await fetch(`${ORIGIN}/v1/state`)).json();
+  uiOk('services/api synced every outcome of the run', st.sync.last_seq === st.counts.next_seq - 1 && st.sync.counts_match, `last_seq ${st.sync.last_seq}, next_seq ${st.counts.next_seq}`);
+  const act = await (await fetch(`${ORIGIN}/v1/activity?status=paid&limit=100`)).json();
+  const listed = act.items.filter((i) => paidIds.has(i.payment_id));
+  uiOk('every paid purchase is listed by /v1/activity', listed.length === paidIds.size, `${listed.length} of ${paidIds.size}`);
+  const reported = listed.filter((i) => i.tx_hash);
+  uiOk('tx hashes reported and verified (POST /v1/tx-reports)', reported.length > 0, `${reported.length} of ${listed.length} rows carry a verified tx hash`);
+
+  browser = await chromium.launch({ executablePath: EXE });
+  use(browser, `${ORIGIN}/`);
+  for (const theme of ['dark', 'light']) {
+    group(`demo dashboard ${theme}`);
+    const o = await open({ theme, hash: '#/agents' });
+    const p = o.page;
+    await p.waitForSelector('[data-check="vault.balance"]', { timeout: 30000 });
+    await checkFigures(p, 'agents', apiState);
+    for (const name of ['research-scout', 'price-watcher', 'summary-writer', 'invoice-bot']) {
+      const row = p.locator('tr.row', { has: p.locator('.nm', { hasText: new RegExp(`^${name}$`) }) });
+      ok(await row.count() === 1, `${name} listed on Agents`);
+    }
+    await noHScroll(p, 'agents');
+    await shot(p, `demo-agents-${theme}-1440`);
+    await p.click('#tabActivity');
+    await p.waitForFunction(() => document.querySelectorAll('tr.row').length > 5, null, { timeout: 30000 });
+    await p.click('.views .tab:has-text("Paid")');
+    await p.waitForFunction(() => document.querySelectorAll('tr.row').length > 0);
+    const rows = await p.$$eval('tr.row td.c-agent', (tds) => tds.map((td) => td.textContent.trim()));
+    const demoRows = rows.filter((n) => ['research-scout', 'price-watcher', 'summary-writer', 'invoice-bot'].includes(n));
+    if (theme === 'dark') uiOk('Activity fills with the agents\' paid rows', demoRows.length >= Math.min(25, paidIds.size), `${demoRows.length} demo rows on the first page, ${paidIds.size} paid in the run`);
+    await shot(p, `demo-activity-${theme}-1440`);
+    await close(o, 'demo dashboard');
+  }
+  const figs = results.filter((r) => r.group.startsWith('demo dashboard') && /formula|figures/.test(r.msg));
+  uiOk('dashboard figures equal /v1/state after the run (both themes)', figs.length > 0 && figs.every((r) => r.pass), `${figs.length} checks`);
+} catch (e) {
+  uiOk('dashboard checks ran', false, e.message.split('\n')[0]);
+} finally {
+  await browser?.close();
+  stopAll();
+}
+if (summary && summaryFile) {
+  summary.checks.push(...uiChecks);
+  summary.title = 'Autonomous demo agents on testnet, with services/api and the dashboard (demo/agents)';
+  writeFileSync(summaryFile, JSON.stringify(summary, null, 2));
+}
+const code = finish('report-demo.json');
+console.log(`\ndemo check: ${results.filter((r) => r.pass).length} passed, ${results.filter((r) => !r.pass).length} failed. Proof: ${proofDir}`);
+writeFileSync(join(work, 'last-logs.txt'), `--- api\n${api.logs().slice(-20000)}\n--- merchant\n${merchant.logs().slice(-20000)}\n`);
+process.exit(code);

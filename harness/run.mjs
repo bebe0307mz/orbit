@@ -3,6 +3,7 @@
 //   vitest: packages/vault-types, apps/dashboard, services/api (per-test results from the JSON reporter)
 //   cargo:  contract unit tests (orbit-vault, mock-ft), CARGO_BUILD_JOBS=4, skipped while another cargo runs
 //   ui:     harness/ui/check-ui.mjs (mock) and check-live.mjs (api + rpc on the fake chain), contrast
+//   opt-in: HARNESS_DEMO=1 runs the demo agents on testnet (check-demo.mjs, spends test tokens)
 //   opt-in: HARNESS_TESTNET=1 adds the read-only testnet UI check (harness/ui/check-testnet.mjs)
 //   also:   Builder A's sandbox results (harness/out/sandbox.json) and testnet proofs (harness/out/testnet-proof*.json)
 import { spawn, execSync } from 'node:child_process';
@@ -238,12 +239,14 @@ const SHOTS = [
   ['live-api-activity-dark-390', 'services/api: cursor activity, 390'], ['live-rpc-agents', 'Direct RPC mode, read only'],
   ['testnet-api-agents-dark-1440', 'Testnet vault via services/api, dark'], ['testnet-api-agents-light-1440', 'Testnet vault via services/api, light'],
   ['testnet-api-agents-dark-390', 'Testnet vault, 390'], ['testnet-rpc-agents-light-1440', 'Testnet vault, direct RPC'],
+  ['demo-agents-dark-1440', 'Demo agents on testnet: Agents'], ['demo-activity-light-1440', 'Demo agents on testnet: paid Activity'],
   ['testnet-api-pause-confirmed', 'Testnet: real guardian pause confirmed'], ['testnet-api-paused-row', 'Testnet: Paused once state() shows it'],
 ];
 
 /* ---------- run ---------- */
 const steps = [
   ['vault-types', () => vitest('vault-types', 'packages/vault-types (formatting, formulas, CLI strings)', 'packages/vault-types')],
+  ['demo-agents', () => vitest('demo-agents', 'demo/agents (decision logic, reactions to rejections)', 'demo/agents')],
   ['dashboard', () => vitest('dashboard', 'apps/dashboard (mock, RPC and API sources)', 'apps/dashboard')],
   ['api', () => vitest('api', 'services/api (syncer, API, guardian, auth on a fake chain)', 'services/api')],
   ['contracts', cargo],
@@ -252,6 +255,8 @@ const steps = [
   ['contrast', contrast],
 ];
 // Opt-in: the dashboard and services/api against the real testnet vault, read only (never sends a pause here).
+// Opt-in, spends test tokens: the four demo agents buy from the merchant for DEMO_MINUTES (default 4) on testnet.
+if (process.env.HARNESS_DEMO === '1') steps.push(['demo', () => ui('demo', 'Demo agents on testnet with services/api and the dashboard', 'harness/ui/check-demo.mjs', 'report-demo.json')]);
 if (process.env.HARNESS_TESTNET === '1') steps.push(['testnet', () => ui('testnet', 'Dashboard and services/api on the testnet vault (read only)', 'harness/ui/check-testnet.mjs', 'report-testnet.json')]);
 const suites = [];
 for (const [id, fn] of steps) {

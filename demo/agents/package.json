@@ -1,0 +1,21 @@
+{
+  "name": "@orbit/demo-agents",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Four autonomous demo agents that buy data from the demo merchant through the Orbit vault (orbit-agent SDK)",
+  "scripts": {
+    "start": "node --experimental-strip-types --no-warnings=ExperimentalWarning src/main.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@orbit/agent": "workspace:*",
+    "@orbit/vault-types": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.8"
+  }
+}
