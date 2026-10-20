@@ -11,6 +11,18 @@ export class RpcError extends Error {
   }
 }
 
+/** Default RPC lists (same as @orbit/vault-types DEFAULT_RPC): FastNEAR first, rpc.*.near.org (deprecated) last. */
+export const DEFAULT_RPC: Record<'mainnet' | 'testnet', string[]> = {
+  mainnet: ['https://free.rpc.fastnear.com', 'https://rpc.mainnet.fastnear.com', 'https://rpc.mainnet.near.org'],
+  testnet: ['https://test.rpc.fastnear.com', 'https://rpc.testnet.fastnear.com', 'https://rpc.testnet.near.org'],
+};
+
+/** Read-only methods: safe to retry on another node. */
+const READS = new Set(['query', 'block', 'chunk', 'status', 'gas_price', 'tx', 'EXPERIMENTAL_tx_status', 'validators']);
+const SENDS = new Set(['send_tx', 'broadcast_tx_commit', 'broadcast_tx_async']);
+/** Error names that say "this node could not answer now", not "the answer is X". */
+const TRANSIENT = /^(INTERNAL_ERROR|TIMEOUT_ERROR|UNKNOWN_BLOCK|NO_SYNCED_BLOCKS|NOT_SYNCED_YET|UNAVAILABLE_SHARD|GARBAGE_COLLECTED_BLOCK|UNKNOWN_CHUNK|UNKNOWN_EPOCH|REQUEST_VALIDATION_ERROR|UNKNOWN_TRANSACTION|HTTP_429|rate_limited)$/;
+
 export interface AccessKeyView {
   nonce: number;
   permission: 'FullAccess' | { FunctionCall: { allowance: string | null; receiver_id: string; method_names: string[] } };
@@ -52,7 +64,14 @@ export class NearRpc {
     this.fetchImpl = fetchImpl;
   }
 
+  /**
+   * Reads fail over to the next URL on transport errors, HTTP 429/5xx, JSON-RPC -429 and transient error bodies.
+   * Sends fail over only when the send was provably refused (HTTP 429 or -429: nothing was accepted); a timeout or
+   * an HTTP 5xx on a send is ambiguous and is thrown, never re-sent elsewhere.
+   */
   async call<T>(method: string, params: unknown, timeoutMs = 20_000): Promise<T> {
+    const isSend = SENDS.has(method);
+    const isRead = READS.has(method);
     let last: RpcError | null = null;
     for (const url of this.urls) {
       let res: Response;
@@ -66,16 +85,27 @@ export class NearRpc {
       } catch (e) {
         const name = (e as Error).name;
         last = new RpcError(name === 'TimeoutError' ? 'TIMEOUT_ERROR' : 'rpc_unreachable', `NEAR RPC ${method}: ${(e as Error).message}`);
-        // A timed-out send may have landed: never retry it on another URL.
-        if (method === 'send_tx' || method === 'broadcast_tx_commit') throw last;
+        // A send that timed out (or whose connection dropped) may have landed: never send it again elsewhere.
+        if (isSend) throw last;
         continue;
       }
-      if (!res.ok && res.status !== 408) {
-        last = new RpcError(`HTTP_${res.status}`, `NEAR RPC returned ${res.status}`);
-        if (res.status === 429 || res.status >= 500) continue;
-        throw last;
+      if (res.status === 429) {
+        last = new RpcError('HTTP_429', `NEAR RPC ${method}: rate limited (429)`);
+        continue; // refused before processing, also for sends
       }
-      const body = (await res.json()) as { result?: T; error?: { code?: number; name?: string; message?: string; cause?: { name?: string; info?: unknown }; data?: unknown } };
+      if (!res.ok && res.status !== 408 && res.status !== 400 && res.status !== 500) {
+        last = new RpcError(`HTTP_${res.status}`, `NEAR RPC ${method} returned ${res.status}`);
+        if (isSend) throw last; // ambiguous
+        continue;
+      }
+      let body: { result?: T; error?: { code?: number; name?: string; message?: string; cause?: { name?: string; info?: unknown }; data?: unknown } };
+      try {
+        body = (await res.json()) as typeof body;
+      } catch {
+        last = new RpcError(`HTTP_${res.status}`, `NEAR RPC ${method}: response is not JSON`);
+        if (isSend) throw last;
+        continue;
+      }
       if (body.error?.code === -429) {
         // Rate limited (the deprecated rpc.*.near.org endpoints answer -429): nothing was accepted, try the next URL.
         last = new RpcError('HTTP_429', `NEAR RPC ${method}: rate limited (-429)`);
@@ -83,7 +113,12 @@ export class NearRpc {
       }
       if (body.error) {
         const code = errorCode(body.error);
-        throw new RpcError(code, `NEAR RPC ${method}: ${code}`, body.error.data ?? body.error.cause);
+        const err = new RpcError(code, `NEAR RPC ${method}: ${code}`, body.error.data ?? body.error.cause);
+        if (isRead && TRANSIENT.test(code)) {
+          last = err;
+          continue;
+        }
+        throw err;
       }
       return body.result as T;
     }
@@ -101,8 +136,8 @@ export class NearRpc {
     return JSON.parse(Buffer.from(r.result).toString('utf8')) as T;
   }
 
-  viewAccessKey(account: string, publicKey: string): Promise<AccessKeyView> {
-    return this.call('query', { request_type: 'view_access_key', finality: 'final', account_id: account, public_key: publicKey });
+  viewAccessKey(account: string, publicKey: string, finality: 'final' | 'optimistic' = 'final'): Promise<AccessKeyView> {
+    return this.call('query', { request_type: 'view_access_key', finality, account_id: account, public_key: publicKey });
   }
 
   async finalBlock(): Promise<{ hash: string; height: number; timestamp_ms: number }> {

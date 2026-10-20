@@ -83,15 +83,22 @@ export class Signer {
   async send(receiver: string, actions: Action[]): Promise<TxResult> {
     for (let attempt = 0; ; attempt++) {
       const r = await this.sendOnce(receiver, actions);
+      // InvalidNonce is a validation refusal: the tx was not included, so re-signing cannot double-execute.
       if (r.failure !== 'InvalidNonce' || attempt >= 3) return r;
       await new Promise((res) => setTimeout(res, 1500));
     }
   }
 
   private async sendOnce(receiver: string, actions: Action[]): Promise<TxResult> {
-    const ak = await this.rpc.viewAccessKey(this.accountId, this.publicKey);
+    // Optimistic view: a previous owner tx (this or another process) is visible before it is final, so back-to-back
+    // commands do not reuse a nonce. max(final, optimistic, local) guards against a lagging node.
+    const [fin, opt] = await Promise.all([
+      this.rpc.viewAccessKey(this.accountId, this.publicKey, 'final'),
+      this.rpc.viewAccessKey(this.accountId, this.publicKey, 'optimistic').catch(() => null),
+    ]);
+    const seen = BigInt(Math.max(fin.nonce, opt?.nonce ?? 0));
     const block = await this.rpc.finalBlock();
-    const nonce = BigInt(ak.nonce) + 1n > this.lastNonce ? BigInt(ak.nonce) + 1n : this.lastNonce + 1n;
+    const nonce = seen + 1n > this.lastNonce ? seen + 1n : this.lastNonce + 1n;
     this.lastNonce = nonce;
     const tx = createTransaction(this.accountId, this.kp.getPublicKey(), receiver, nonce, actions, baseDecode(block.hash));
     const digest = new Uint8Array(createHash('sha256').update(encodeTransaction(tx)).digest());

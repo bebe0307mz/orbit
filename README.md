@@ -16,7 +16,7 @@ Orbit puts every limit inside one NEAR contract. Each payment is checked and res
 - **A pause-only guardian key.** A second function-call key with methods exactly `pause_agent,pause_all`, held by the dashboard server. It cannot resume, withdraw, change limits or upgrade.
 - **NEP-141 USDC.** The owner deposits with `ft_transfer_call`; `ft_on_transfer` credits only the owner and only the pinned token, clamped to a float cap, and the excess is refunded by NEP-141. Payments use `ft_transfer` with a settle callback that refunds on failure.
 - **NEP-297 events** (`orbit-vault` 1.0.0) for every reservation, payment, rejection and admin action.
-- Access-key nonces stop re-broadcast of a signed transaction; a stored `payment_id` stops a second payment for one invoice.
+- Re-broadcasting identical signed bytes returns the original result and never executes twice (observed on testnet and in the sandbox); a stored `payment_id` stops a second payment for one invoice.
 
 ## Architecture
 
@@ -90,7 +90,7 @@ See: `New account <orbit-owner-<s>.testnet> created successfully.` five times. T
 Then set the environment (keep it outside the repo):
 
 ```bash
-export NEAR_NETWORK=testnet NEAR_RPC_URL=https://rpc.testnet.fastnear.com,https://rpc.testnet.near.org
+export NEAR_NETWORK=testnet   # NEAR_RPC_URL is optional: default https://test.rpc.fastnear.com, then rpc.testnet.fastnear.com, then rpc.testnet.near.org
 export VAULT_ACCOUNT_ID=orbit-vault-<s>.testnet OWNER_ACCOUNT_ID=orbit-owner-<s>.testnet TOKEN_ACCOUNT_ID=orbit-token-<s>.testnet
 export MERCHANT_ACCOUNT_ID=orbit-merchant-<s>.testnet UNLISTED_ACCOUNT_ID=orbit-unlisted-<s>.testnet
 export ORBIT_KEY_DIR=$HOME/.near-credentials/orbit-testnet/$VAULT_ACCOUNT_ID

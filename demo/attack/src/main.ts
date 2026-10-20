@@ -15,7 +15,7 @@ import { homedir } from 'node:os';
 import type { KeyPair } from '@near-js/crypto';
 import { actionCreators, createTransaction, encodeTransaction, Signature, SignedTransaction } from '@near-js/transactions';
 import { baseDecode, baseEncode } from '@near-js/utils';
-import { keygen, loadKey, NearRpc, OrbitAgent, PAY_GAS, parseOutcome, RpcError, type PayOutcome } from '@orbit/agent';
+import { DEFAULT_RPC, keygen, loadKey, NearRpc, OrbitAgent, PAY_GAS, parseOutcome, RpcError, type PayOutcome } from '@orbit/agent';
 import { keyFileFor, ONE_YOCTO, Signer } from '@orbit/cli/signer';
 
 const env = (k: string, d?: string) => {
@@ -219,7 +219,7 @@ async function main(argv: string[]): Promise<number> {
     vault,
     merchant: env('MERCHANT_ACCOUNT_ID'),
     unlisted: env('UNLISTED_ACCOUNT_ID', 'unlisted-shop.testnet'),
-    rpc: new NearRpc(env('NEAR_RPC_URL', network === 'mainnet' ? 'https://rpc.mainnet.fastnear.com,https://rpc.mainnet.near.org' : 'https://rpc.testnet.fastnear.com,https://rpc.testnet.near.org').split(',')),
+    rpc: new NearRpc(process.env.NEAR_RPC_URL ? process.env.NEAR_RPC_URL.split(',') : DEFAULT_RPC[network]),
     network,
     keyDir: env('ORBIT_KEY_DIR', join(homedir(), '.near-credentials', 'orbit-' + network, vault)),
     owner: process.env.OWNER_ACCOUNT_ID ?? null,

@@ -12,7 +12,7 @@ import { basename, dirname, join, resolve } from 'node:path';
 import { createInterface } from 'node:readline/promises';
 import { fileURLToPath } from 'node:url';
 import { baseEncode } from '@near-js/utils';
-import { KeyFileError, loadKey, NearRpc, type AccessKeyView } from '@orbit/agent';
+import { DEFAULT_RPC, KeyFileError, loadKey, NearRpc, type AccessKeyView } from '@orbit/agent';
 import { fmtNear, fmtUsdc, GrammarError, nearToYocto, parse, parsePaste, usdcToBase, VERBS, type Command } from './grammar.ts';
 import { keyFileFor, ONE_YOCTO, Signer, TGAS, type TxResult } from './signer.ts';
 
@@ -352,7 +352,7 @@ function makeCtx(cmd: Command, ask: Ctx['ask'], out: Ctx['out']): Ctx {
   const mainnet = cmd.network === 'mainnet';
   return {
     cmd,
-    rpc: new NearRpc(envOr('NEAR_RPC_URL', mainnet ? 'https://rpc.mainnet.fastnear.com,https://rpc.mainnet.near.org' : 'https://rpc.testnet.fastnear.com,https://rpc.testnet.near.org').split(',')),
+    rpc: new NearRpc(process.env.NEAR_RPC_URL ? process.env.NEAR_RPC_URL.split(',') : DEFAULT_RPC[cmd.network]),
     vault: envOr('VAULT_ACCOUNT_ID'),
     owner: envOr('OWNER_ACCOUNT_ID'),
     token: envOr('TOKEN_ACCOUNT_ID'),

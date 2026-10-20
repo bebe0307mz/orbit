@@ -7,7 +7,7 @@
 # Config from env (accounts must exist, created e.g. with
 #   near account create-account sponsor-by-faucet-service <id> autogenerate-new-keypair save-to-legacy-keychain network-config testnet create):
 #   ORBIT_VAULT ORBIT_OWNER ORBIT_TOKEN ORBIT_MERCHANT ORBIT_UNLISTED   (testnet account ids)
-#   ORBIT_RPC (default https://rpc.testnet.near.org)
+#   ORBIT_RPC (default https://test.rpc.fastnear.com; rpc.testnet.near.org is deprecated and throttled)
 #   ORBIT_KEY_DIR (default ~/.near-credentials/orbit-testnet/<vault>): guardian and agent key files, never in the repo
 #   ORBIT_SKIP_DEPLOY=1 to rerun only the proof against an existing deployment.
 # Signing: owner, token and vault deploy key from the near-cli legacy keychain; agents and guardian from key files.
@@ -17,7 +17,7 @@ cd "$(dirname "$0")/.."
 export PATH="$HOME/.cargo/bin:$PATH"
 
 : "${ORBIT_VAULT:?}" "${ORBIT_OWNER:?}" "${ORBIT_TOKEN:?}" "${ORBIT_MERCHANT:?}" "${ORBIT_UNLISTED:?}"
-RPC="${ORBIT_RPC:-https://rpc.testnet.near.org}"
+RPC="${ORBIT_RPC:-https://test.rpc.fastnear.com}"
 KEY_DIR="${ORBIT_KEY_DIR:-$HOME/.near-credentials/orbit-testnet/$ORBIT_VAULT}"
 RUN="testnet-$(date -u +%Y%m%dT%H%M%SZ)"
 OUT="harness/out/$RUN"
