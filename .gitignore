@@ -1,0 +1,23 @@
+# Pre-hackathon planning docs: never committed (founder rule)
+docs/
+# Secrets and keys
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+keys/
+.near-credentials/
+**/credentials/
+# Build output
+target/
+node_modules/
+dist/
+.turbo/
+*.wasm
+!contracts/**/res/.gitkeep
+harness/out/
+*.sqlite
+*.sqlite-journal
+*.db
+.DS_Store
