@@ -7,6 +7,8 @@ import { SignInDialog } from './SignInDialog';
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
 
+const CIRCLE_TESTNET_USDC = '3e2210e1184b45b64c8a434c0a7e7b23cc04ea7eb7a6c3c32520d03d4afcb8af';
+
 /** True when the snapshot is stale: the API's flag, or a block age above STALE_MS. */
 export function useStale(): { stale: boolean; ageMs: number } {
   const { state, source } = useStore();
@@ -61,7 +63,8 @@ function SessionSlot() {
 export function Shell({ screen }: { screen: Screen }) {
   const { state, source } = useStore();
   const network = state?.network ?? source.network;
-  const testToken = network === 'testnet' && !!state?.vault.token.startsWith('otusd');
+  // Any testnet token other than Circle's testnet USDC is Orbit's own open-mint test token (otusd)
+  const testToken = network === 'testnet' && !!state && state.vault.token !== CIRCLE_TESTNET_USDC;
   return (
     <header className="topbar">
       <span className="wordmark">Orbit</span>

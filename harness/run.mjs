@@ -3,6 +3,7 @@
 //   vitest: packages/vault-types, apps/dashboard, services/api (per-test results from the JSON reporter)
 //   cargo:  contract unit tests (orbit-vault, mock-ft), CARGO_BUILD_JOBS=4, skipped while another cargo runs
 //   ui:     harness/ui/check-ui.mjs (mock) and check-live.mjs (api + rpc on the fake chain), contrast
+//   opt-in: HARNESS_TESTNET=1 adds the read-only testnet UI check (harness/ui/check-testnet.mjs)
 //   also:   Builder A's sandbox results (harness/out/sandbox.json) and testnet proofs (harness/out/testnet-proof*.json)
 import { spawn, execSync } from 'node:child_process';
 import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
@@ -190,10 +191,11 @@ function proofs() {
 
 /** Builder A's scripts/testnet-proof.sh runs: harness/out/testnet-<utc>/ with summary.json (checks) and txs.tsv. Newest first. */
 function proofRuns() {
-  const dirs = existsSync(OUT) ? readdirSync(OUT).filter((d) => /^testnet-\d{8}T\d{6}Z$/.test(d) && statSync(join(OUT, d)).isDirectory()).sort().reverse() : [];
+  const dirs = existsSync(OUT) ? readdirSync(OUT).filter((d) => /^testnet-(?:[a-z]+-)?\d{8}T\d{6}Z$/.test(d) && statSync(join(OUT, d)).isDirectory()).sort((a, b) => b.slice(-16).localeCompare(a.slice(-16))) : [];
   return dirs.map((d) => {
-    const at = d.replace(/^testnet-(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/, '$1-$2-$3T$4:$5:$6Z');
-    const run = { dir: d, at, network: 'testnet', vault: null, block: null, checks: [], txs: [], counts: null, complete: false };
+    const at = d.replace(/^testnet-(?:[a-z]+-)?(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/, '$1-$2-$3T$4:$5:$6Z');
+    const kind = d.match(/^testnet-([a-z]+)-/)?.[1] ?? 'contract';
+    const run = { dir: d, at, kind, network: 'testnet', vault: null, block: null, checks: [], txs: [], counts: null, complete: false };
     const sumFile = join(OUT, d, 'summary.json');
     if (existsSync(sumFile)) {
       try {
@@ -202,6 +204,7 @@ function proofRuns() {
         run.vault = j.vault ?? null;
         run.block = j.block_height ?? null;
         run.counts = j.counts ?? null;
+        run.title = j.title ?? null;
         run.checks = (j.checks ?? []).map((c) => ({ check: String(c.check ?? ''), ok: c.ok === true, detail: c.detail == null ? '' : String(c.detail) }));
       } catch {
         run.checks = [{ check: 'summary.json', ok: false, detail: 'not valid JSON' }];
@@ -233,6 +236,9 @@ const SHOTS = [
   ['state-rpcerror-light', 'RPC error'], ['state-empty-dark', 'Empty vault'],
   ['live-api-agents-light-1440', 'services/api mode, light'], ['live-api-pause-confirmed', 'services/api: guardian pause confirmed'],
   ['live-api-activity-dark-390', 'services/api: cursor activity, 390'], ['live-rpc-agents', 'Direct RPC mode, read only'],
+  ['testnet-api-agents-dark-1440', 'Testnet vault via services/api, dark'], ['testnet-api-agents-light-1440', 'Testnet vault via services/api, light'],
+  ['testnet-api-agents-dark-390', 'Testnet vault, 390'], ['testnet-rpc-agents-light-1440', 'Testnet vault, direct RPC'],
+  ['testnet-api-pause-confirmed', 'Testnet: real guardian pause confirmed'], ['testnet-api-paused-row', 'Testnet: Paused once state() shows it'],
 ];
 
 /* ---------- run ---------- */
@@ -245,6 +251,8 @@ const steps = [
   ['ui-live', () => ui('ui-live', 'Dashboard UI live: services/api and direct RPC on the fake chain', 'harness/ui/check-live.mjs', 'report-live.json')],
   ['contrast', contrast],
 ];
+// Opt-in: the dashboard and services/api against the real testnet vault, read only (never sends a pause here).
+if (process.env.HARNESS_TESTNET === '1') steps.push(['testnet', () => ui('testnet', 'Dashboard and services/api on the testnet vault (read only)', 'harness/ui/check-testnet.mjs', 'report-testnet.json')]);
 const suites = [];
 for (const [id, fn] of steps) {
   if (only.length && !only.includes(id)) continue;
