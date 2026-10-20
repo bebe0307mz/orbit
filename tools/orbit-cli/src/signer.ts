@@ -77,10 +77,23 @@ export class Signer {
     return this.kp.getPublicKey().toString();
   }
 
+  private lastNonce = 0n;
+
+  /** Signs and sends; an InvalidNonce (stale RPC view, tx provably not included) is re-signed up to 3 times. */
   async send(receiver: string, actions: Action[]): Promise<TxResult> {
+    for (let attempt = 0; ; attempt++) {
+      const r = await this.sendOnce(receiver, actions);
+      if (r.failure !== 'InvalidNonce' || attempt >= 3) return r;
+      await new Promise((res) => setTimeout(res, 1500));
+    }
+  }
+
+  private async sendOnce(receiver: string, actions: Action[]): Promise<TxResult> {
     const ak = await this.rpc.viewAccessKey(this.accountId, this.publicKey);
     const block = await this.rpc.finalBlock();
-    const tx = createTransaction(this.accountId, this.kp.getPublicKey(), receiver, BigInt(ak.nonce) + 1n, actions, baseDecode(block.hash));
+    const nonce = BigInt(ak.nonce) + 1n > this.lastNonce ? BigInt(ak.nonce) + 1n : this.lastNonce + 1n;
+    this.lastNonce = nonce;
+    const tx = createTransaction(this.accountId, this.kp.getPublicKey(), receiver, nonce, actions, baseDecode(block.hash));
     const digest = new Uint8Array(createHash('sha256').update(encodeTransaction(tx)).digest());
     const sig = this.kp.sign(digest);
     const signed = new SignedTransaction({ transaction: tx, signature: new Signature({ keyType: tx.publicKey.keyType, data: sig.signature }) });

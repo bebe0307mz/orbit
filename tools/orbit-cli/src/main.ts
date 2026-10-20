@@ -143,7 +143,11 @@ async function status(ctx: Ctx): Promise<boolean> {
   const free = n(s.near.balance) - BigInt(s.near.storage_usage) * 10n ** 19n;
   const checks: [string, boolean, string][] = [];
   checks.push(['C1 conservation (I7)', n(s.deposited_total) === held + n(s.paid_total) + n(s.withdrawn_total), `${s.deposited_total} = ${s.available}+${s.reserved}+${s.paid_total}+${s.withdrawn_total}`]);
-  checks.push(['C2 token backing', bal >= held, `ft_balance_of ${bal} >= ${held}`]);
+  // In flight, a payment's ft_transfer may already have moved tokens while its settle callback is not final yet,
+  // so the strict form holds only when nothing is pending; the in-flight-safe form always holds.
+  const strict = s.pending_count === 0;
+  const need = strict ? held : n(s.available) + n(s.reserved) - n(s.org.reserved);
+  checks.push(['C2 token backing', bal >= need, `ft_balance_of ${bal} >= ${need}${strict ? '' : ' (available + withdrawals in flight; payments pending)'}`]);
   checks.push(['C3 counters (I9)', s.counts.next_seq === s.counts.paid + s.counts.failed + s.counts.rejected, JSON.stringify(s.counts)]);
   const live = new Map(s.agents.filter((a) => a.status !== 'revoked').map((a) => [a.pk, a.name]));
   const bad: string[] = [];
@@ -353,10 +357,16 @@ function makeCtx(cmd: Command, ask: Ctx['ask'], out: Ctx['out']): Ctx {
 
 export async function main(argv: string[], io: { ask?: Ctx['ask']; out?: Ctx['out'] } = {}): Promise<number> {
   const out = io.out ?? ((s: string) => console.log(s));
+  // Line reader over stdin that buffers piped input (readline's question() drops lines that arrive early).
   let rl: ReturnType<typeof createInterface> | null = null;
+  let lines: AsyncIterator<string> | null = null;
   const ask = io.ask ?? (async (q: string) => {
-    rl ??= createInterface({ input: process.stdin, output: process.stdout, terminal: false });
-    return rl.question(q);
+    rl ??= createInterface({ input: process.stdin, terminal: false });
+    lines ??= rl[Symbol.asyncIterator]();
+    process.stdout.write(q);
+    const r = await lines.next();
+    if (r.done) throw new CliError('no input');
+    return r.value;
   });
   try {
     if (!argv.length || argv[0] === 'help' || argv[0] === '--help') {
