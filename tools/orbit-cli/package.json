@@ -23,5 +23,9 @@
     "@types/node": "^22.10.0",
     "typescript": "^5.6.3",
     "vitest": "^2.1.8"
+  },
+  "exports": {
+    "./signer": "./src/signer.ts",
+    "./grammar": "./src/grammar.ts"
   }
 }

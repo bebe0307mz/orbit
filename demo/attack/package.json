@@ -1,0 +1,24 @@
+{
+  "name": "@orbit/attack",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Orbit demo attack script: rejected attempts, replay, rebroadcast, and the 20-payment burst (testnet by default)",
+  "scripts": {
+    "start": "node --experimental-strip-types --no-warnings=ExperimentalWarning src/main.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@orbit/agent": "workspace:*",
+    "@orbit/cli": "workspace:*",
+    "@near-js/crypto": "2.5.1",
+    "@near-js/transactions": "2.5.1",
+    "@near-js/utils": "2.5.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.8"
+  }
+}

@@ -13,6 +13,9 @@
     "check:ui:mock": "node harness/ui/check-ui.mjs",
     "check:ui:live": "node harness/ui/check-live.mjs",
     "check:contrast": "node harness/ui/contrast.mjs",
-    "harness": "node harness/run.mjs"
+    "harness": "node harness/run.mjs",
+    "demo:attack": "node --experimental-strip-types --no-warnings=ExperimentalWarning demo/attack/src/main.ts",
+    "orbit-cli": "node --experimental-strip-types --no-warnings=ExperimentalWarning tools/orbit-cli/src/main.ts",
+    "merchant": "pnpm --filter @orbit/merchant start"
   }
 }
