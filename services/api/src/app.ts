@@ -281,10 +281,20 @@ export function createApp(d: AppDeps) {
       if (w > 0) throw new HttpError(429, 'rate_limited', 'Too many reports', { retryAfter: w });
       reportIp.hit(ip, now());
       if (store.txHashKnown(txHash)) return send(res, 204);
+      // a report can arrive while a tick that read state() before this payment is still running: join it, then
+      // run one fresh tick so the payment is seen
+      const freshTick = async () => {
+        await syncer.tick();
+        await syncer.tick();
+      };
+      const refuse = (status: number, code: string, message: string) => {
+        log.info('tx_report_refused', { payment_id: paymentId, tx_hash: txHash, code });
+        return new HttpError(status, code, message);
+      };
       const known = () => store.outcomeByPayment(paymentId).length > 0 || !!syncer.latest?.S.pending.some((p) => p.payment_id === paymentId);
       if (!known()) {
-        await syncer.tick();
-        if (!known()) throw new HttpError(404, 'payment_unknown', 'Payment id not seen on the vault');
+        await freshTick();
+        if (!known()) throw refuse(404, 'payment_unknown', 'Payment id not seen on the vault');
       }
       const cachedFail = failedVerify.get(txHash);
       if (cachedFail && now() - cachedFail < 600_000) throw new HttpError(422, 'tx_mismatch', 'Transaction does not report this payment');
@@ -294,20 +304,20 @@ export function createApp(d: AppDeps) {
       try {
         outcome = await rpc.txStatus(txHash, config.vaultAccount);
       } catch {
-        throw new HttpError(404, 'tx_not_found', 'Transaction not found or not final');
+        throw refuse(404, 'tx_not_found', 'Transaction not found or not final');
       }
       const seq = seqFromEvents(outcome.receipts_outcome, config.vaultAccount, paymentId);
       if (seq == null) {
         failedVerify.set(txHash, now());
-        throw new HttpError(422, 'tx_mismatch', 'Transaction does not report this payment');
+        throw refuse(422, 'tx_mismatch', 'Transaction does not report this payment');
       }
       if (!store.setTxHash(seq, paymentId, txHash)) {
-        if (!store.outcomeBySeq(seq)) await syncer.tick();
+        if (!store.outcomeBySeq(seq)) await freshTick();
         const row = store.outcomeBySeq(seq);
         if (row?.tx_hash === txHash) return send(res, 204);
         if (!row || row.payment_id !== paymentId || !store.setTxHash(seq, paymentId, txHash)) {
           failedVerify.set(txHash, now());
-          throw new HttpError(422, 'tx_mismatch', 'Outcome row does not match');
+          throw refuse(422, 'tx_mismatch', 'Outcome row does not match');
         }
       }
       log.info('tx_report_verified', { payment_id: paymentId, seq, tx_hash: txHash });

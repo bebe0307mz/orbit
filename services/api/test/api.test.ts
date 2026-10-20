@@ -477,6 +477,38 @@ describe('pause op lifecycle', () => {
 });
 
 describe('tx reports', () => {
+  it('verifies a reported tx against its NEP-297 event and stores the hash', async () => {
+    const c = await setup();
+    const pay = c.chain.addPaid(2);
+    const r = await req(c, '/v1/tx-reports', { method: 'POST', body: { payment_id: pay.payment_id, tx_hash: pay.hash } });
+    expect(r.status).toBe(204);
+    const item = (await req(c, '/v1/activity?limit=1')).json.items.find((i: { seq: number | null }) => i.seq === pay.seq);
+    expect(item.tx_hash).toBe(pay.hash);
+  });
+
+  it('regression: a report racing a tick that read state() before the payment is still accepted', async () => {
+    const chain = new FakeChain();
+    let hold = false;
+    // snapshot state() now, answer 400 ms later: the tick stays running with a view from before the payment
+    const slow = (async (url: string, init: RequestInit) => {
+      const isState = JSON.parse(String(init.body)).params?.method_name === 'state';
+      const res = await chain.fetch(url, init);
+      if (hold && isState) {
+        hold = false;
+        await new Promise((r) => setTimeout(r, 400));
+      }
+      return res;
+    }) as unknown as typeof fetch;
+    const c = await setup({ chain, fetchImpl: slow });
+    hold = true;
+    const stale = c.api.syncer.tick();
+    const pay = chain.addPaid(3);
+    const r = await req(c, '/v1/tx-reports', { method: 'POST', body: { payment_id: pay.payment_id, tx_hash: pay.hash } });
+    await stale;
+    expect(r.status).toBe(204);
+    expect(c.api.store.outcomeBySeq(pay.seq)?.tx_hash).toBe(pay.hash);
+  });
+
   it('rejects an unknown payment and malformed input', async () => {
     const c = await setup();
     expect((await req(c, '/v1/tx-reports', { method: 'POST', body: { payment_id: 'zz', tx_hash: 'x' } })).status).toBe(400);

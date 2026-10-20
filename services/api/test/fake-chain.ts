@@ -80,6 +80,24 @@ export class FakeChain {
     this.state.timestamp_ms = this.ts0 + blocks * 600;
   }
 
+  /** A payment by `agentId` that reserved and settled since the last read: ring outcome, counters, and its final tx. */
+  addPaid(agentId: number, amount = '10000'): { payment_id: string; seq: number; hash: string } {
+    const seq = this.state.counts.next_seq;
+    const payment_id = createHash('sha256').update('paid' + seq).digest('hex');
+    const hash = baseEncode(new Uint8Array(createHash('sha256').update('tx' + seq).digest()));
+    const merchant = 'orbit-data.orbit-team.near';
+    this.ring.push({ seq, kind: 'paid', agent_id: agentId, payment_id, merchant, amount, reason: null, block_height: this.state.block_height, timestamp_ms: this.state.timestamp_ms });
+    this.state.counts.next_seq++;
+    this.state.counts.paid++;
+    this.state.paid_total = (BigInt(this.state.paid_total) + BigInt(amount)).toString();
+    this.state.available = (BigInt(this.state.available) - BigInt(amount)).toString();
+    const a = this.state.agents.find((x) => x.id === agentId)!;
+    a.paid_count++;
+    const ev = { standard: 'orbit-vault', version: '1.0.0', event: 'payment_paid', data: [{ payment_id, agent_id: agentId, merchant, amount, seq, reason: null }] };
+    this.txs.set(hash, { hash, method: 'pay', args: {}, executeAt: 0, failure: null, executed: true, logs: [`EVENT_JSON:${JSON.stringify(ev)}`] });
+    return { payment_id, seq, hash };
+  }
+
   /** Append n rejected outcomes (agent 6, agent_paused) so the ring moves. */
   addRejected(n: number): void {
     for (let i = 0; i < n; i++) {
