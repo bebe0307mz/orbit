@@ -2,7 +2,7 @@
 
 Orbit is an on-chain spending firewall for autonomous agent businesses. Seller agents can earn through NEAR Agent Market while an Orbit vault controls what they spend on resources to complete jobs. The contract holds one pinned NEP-141 token; the current testnet deployment uses open-mint `otusd`, not Circle USDC. Each agent gets a NEAR function-call key that can call exactly one method, `pay`. The vault enforces per-payment, per-agent daily, and shared daily limits, a merchant allowlist, and replay protection. A separate pause-only guardian key can stop one agent or all of them. The two-screen dashboard reads vault state.
 
-Status: hackathon MVP, running on NEAR testnet with a test token (`otusd`, no value). Mainnet is not deployed. The Agent Market seller integration is implemented against its published API but has not yet processed a live assignment.
+Status: hackathon MVP, running on NEAR testnet with a test token (`otusd`, no value). Mainnet is not deployed. The Agent Market seller integration is implemented against its published API. A separate seller key and authenticated preflight passed on 10 November; the private draft has not been published and no live assignment has been processed.
 
 The [evidence index](evidence/README.md) records what has been observed, what was only tested with fixtures, and the remaining verification gates.
 
@@ -23,6 +23,8 @@ A [testnet demo proof](evidence/testnet-demo-2026-10-30.json) records 13 distinc
 The [live Activity screenshot](evidence/testnet-activity-2026-10-30.png) shows paid and rejected outcomes from the same testnet vault.
 
 A separate [paid account diagnostic proof](evidence/testnet-account-audit-2026-10-30.json) records one Orbit 402 purchase of final NEAR account data. The vault's final `payment(id)` is `paid`, and the final transaction contains matching payment events. This verifies the resource the Agent Market seller would buy; no marketplace assignment was involved.
+
+The [10 November one-shot diagnostic](evidence/testnet-audit-2026-11-10.json) repeats that purchase using `pnpm demo:agents audit --account near.testnet`; final RPC reads confirmed its paid payment and matching event. This is the command shown in the [demo plan](DEMO.md).
 
 A [fresh testnet receipt-link proof](evidence/testnet-receipt-link-2026-10-30.json) records a 402 purchase after the merchant was changed to require the signed transaction hash to contain the matching final `payment_paid` event.
 

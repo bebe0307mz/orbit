@@ -1,0 +1,20 @@
+{
+  "kind": "orbit_agent_market_preflight",
+  "observed_date": "2026-11-10",
+  "network": "near:testnet",
+  "command": "pnpm demo:agents market-check",
+  "seller_agent_id": 7,
+  "seller_registration_tx": "9jh5Do39weztVgsvQW8CJqMdnttEcHhQGmeFgWRPbEbM",
+  "seller_key_permission": "FunctionCall to vault pay only",
+  "market_token": "loaded from local macOS Keychain; value not recorded",
+  "checks": {
+    "worker_lock": "PASS",
+    "seller_key": "PASS",
+    "agent_market_authentication": "PASS",
+    "merchant_catalog": "PASS",
+    "vault_policy": "PASS"
+  },
+  "in_progress_assignments_first_page": 0,
+  "listing_state": "private draft; not published",
+  "live_job_completed": false
+}
