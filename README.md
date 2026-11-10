@@ -1,6 +1,6 @@
 # Orbit
 
-Orbit is an on-chain spending firewall for autonomous agent businesses. Seller agents can earn through NEAR Agent Market while an Orbit vault controls what they spend on resources to complete jobs. The contract holds one pinned NEP-141 token; the current testnet deployment uses open-mint `otusd`, not Circle USDC. Each agent gets a NEAR function-call key that can call exactly one method, `pay`. The vault enforces per-payment, per-agent daily, and shared daily limits, a merchant allowlist, and replay protection. A separate pause-only guardian key can stop one agent or all of them. The two-screen dashboard reads vault state.
+Orbit gives a business running several autonomous agents one shared spending budget. Each agent can buy an allowlisted resource using its own NEAR key, but the vault contract holds the money and enforces the company-wide cap even when agents pay at the same time. The intended use is a seller fleet that earns through NEAR Agent Market and buys data or compute to finish jobs; a live marketplace job has not yet been completed. The contract holds one pinned NEP-141 token; the current testnet deployment uses open-mint `otusd`, not Circle USDC. Each agent's function-call key can call exactly one method, `pay`. The vault also enforces per-payment and per-agent daily limits and replay protection. A separate pause-only guardian key can stop one agent or all of them. The two-screen dashboard reads vault state.
 
 Status: hackathon MVP, running on NEAR testnet with a test token (`otusd`, no value). Mainnet is not deployed. The Agent Market seller integration is implemented against its published API. A separate seller key and authenticated preflight passed on 10 November; the private draft has not been published and no live assignment has been processed.
 
@@ -26,6 +26,8 @@ A separate [paid account diagnostic proof](evidence/testnet-account-audit-2026-1
 
 The [10 November one-shot diagnostic](evidence/testnet-audit-2026-11-10.json) repeats that purchase using `pnpm demo:agents audit --account near.testnet`; final RPC reads confirmed its paid payment and matching event. This is the command shown in the [demo plan](DEMO.md).
 
+Anyone can recheck that recorded purchase and the vault's current key permissions without credentials: `node scripts/verify-public-proof.mjs`. It reads public final NEAR testnet RPC state and exits nonzero on a mismatch. It does not prove a marketplace job or the separate sandbox concurrency result.
+
 A [fresh testnet receipt-link proof](evidence/testnet-receipt-link-2026-10-30.json) records a 402 purchase after the merchant was changed to require the signed transaction hash to contain the matching final `payment_paid` event.
 
 ## The problem
@@ -35,6 +37,8 @@ An agent that pays for APIs needs spending authority. Giving it a wallet key mea
 Orbit puts every limit inside one NEAR contract. Each payment is checked and reserved in a single receipt, so the limits hold under any concurrency. On testnet, 20 simultaneous $0.05 payments from one agent against a $0.25 daily limit gave 5 paid and 15 rejected. The checked-in sandbox scenario `T-14b` tests the stronger fleet claim: 20 simultaneous payments from four agents against one $0.25 organization limit give 5 paid and 15 `over_org_daily_limit` rejections, with the merchant's token balance and final vault accounting checked.
 
 ## NEAR features used
+
+NEAR matters here because function-call access keys restrict each agent at the protocol level to this vault's `pay` method, while the same contract account holds and enforces one shared token budget. The merchant can verify final contract payment from public receipts. Other chains can implement spending controls with smart accounts and modules; Orbit's claim is this specific combination and its demonstrated shared-cap behavior, not that spending limits are unique to NEAR.
 
 - **Function-call access keys, one per agent.** The vault adds each agent's key to its own account with the method list exactly `["pay"]`, receiver the vault and a limited NEAR allowance. The protocol refuses any other method (`MethodNameMismatch`), any deposit (`DepositWithFunctionCall`) and any other receiver. The contract identifies the agent by `env::signer_account_pk()`.
 - **A pause-only guardian key.** A second function-call key with methods exactly `pause_agent,pause_all`, held by the dashboard server. It cannot resume, withdraw, change limits or upgrade.

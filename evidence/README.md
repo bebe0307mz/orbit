@@ -1,4 +1,4 @@
-# Orbit evidence index — 30 October 2026
+# Orbit evidence index — updated 11 November 2026
 
 These files are reproducible observations, not a completed NEAR Hackathon submission or proof of a live Agent Market seller job. The deployed testnet vault uses an open-mint test token with no monetary value. The four demo agents follow fixed rules; the quote feed is synthetic.
 
@@ -15,6 +15,8 @@ These files are reproducible observations, not a completed NEAR Hackathon submis
 | [Agents screenshot](testnet-agents-2026-10-30.png) and [Activity screenshot](testnet-activity-2026-10-30.png) | The dashboard displayed testnet fleet and payment state during the live demo. | A separate independent usability review. |
 
 ## Verification status
+
+- `node scripts/verify-public-proof.mjs` independently rechecks the fresh diagnostic's final vault payment, signer key scope, pause-only guardian, signed `pay` arguments, matching `payment_paid` event, and NEP-141 transfer using public testnet RPC. It passed on 11 November. It cannot recheck the historical HTTP response or turn a test token into real money.
 
 - `pnpm test`: 218 TypeScript tests passed; three external testnet tests skipped on 10 November 2026. One merchant testnet test was also run separately with a registered key and passed against the live vault on 30 October.
 - `cargo test -p orbit-sandbox-tests -- --nocapture`: 25 sandbox scenarios passed, zero failed; the optional UTC-midnight rollover scenario was skipped.
