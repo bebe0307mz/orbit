@@ -80,7 +80,8 @@ const ORIGIN = `http://127.0.0.1:${API_PORT}`;
 const api = spawn('node', [...NODE_TS, 'src/main.ts'], {
   cwd: API,
   env: {
-    ...process.env, NEAR_NETWORK: 'mainnet', VAULT_ACCOUNT: VAULT, RPC_URL: CHAIN_URL, DB_PATH: join(tmp, 'orbit.sqlite'),
+    // Parent testnet demo env may name real RPC fallbacks. This suite must use only its fake chain.
+    ...process.env, NEAR_NETWORK: 'mainnet', VAULT_ACCOUNT: VAULT, RPC_URL: CHAIN_URL, RPC_FALLBACK_URL: '', NEAR_RPC_URL: '', DB_PATH: join(tmp, 'orbit.sqlite'),
     GUARDIAN_KEY_FILE: keyFile, OPERATOR_PASSWORD_HASH: pwHash, SESSION_SECRET: 'harness-session-secret-0123456789',
     PUBLIC_ORIGIN: ORIGIN, PORT: String(API_PORT), HOST: '127.0.0.1', DASHBOARD_DIR: distApi, OP_POLL_MS: '700',
     ORBIT_TEST_CLOCK_OFFSET_MS: String(offset),
@@ -169,6 +170,19 @@ async function apiMode() {
   await a.page.waitForSelector('tr.detail');
   ok(/Payment id/.test(await text(a.page, 'tr.detail')), 'expanded row');
   await close(a, 'api activity');
+
+  group('api activity history failure');
+  const h = await open({ hash: '#/agents' });
+  await h.page.route('**/v1/activity?*', (route) => route.fulfill({ status: 503, contentType: 'application/json', body: '{"error":"temporary outage"}' }));
+  await h.page.click('#tabActivity');
+  await h.page.waitForSelector('[data-testid="history-error"]');
+  ok(/Payment history did not load/.test(await text(h.page, '[data-testid="history-error"]')), 'history failure is explicit');
+  ok((await h.page.locator('.empty-row').count()) === 0, 'history failure is not presented as no matching payments');
+  await h.page.unroute('**/v1/activity?*');
+  await h.page.click('[data-testid="history-error"] button');
+  await h.page.waitForFunction(() => document.querySelectorAll('tr.row').length === 27);
+  ok((await h.page.locator('[data-testid="history-error"]').count()) === 0, 'history retry recovers the ledger');
+  await close(h, 'api history failure', [/status of 503/]);
 }
 
 /* ---------- rpc mode ---------- */

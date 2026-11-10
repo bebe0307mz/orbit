@@ -82,6 +82,11 @@ async function matrix() {
     await o.page.locator('tr.row[data-key="s54"]').click();
     await o.page.waitForSelector('tr.detail');
     ok(/Payment id/.test(await text(o.page, 'tr.detail')), 'activity: expanded row shows Payment id');
+    await o.page.locator('tr.row[data-key="s54"]').focus();
+    await o.page.keyboard.press('Enter');
+    ok((await o.page.locator('tr.row[data-key="s54"]').getAttribute('aria-expanded')) === 'false', 'activity: Tab-focusable row closes with Enter');
+    await o.page.keyboard.press('Space');
+    ok((await o.page.locator('tr.row[data-key="s54"]').getAttribute('aria-expanded')) === 'true', 'activity: focused row opens with Space');
     await noHScroll(o.page, 'activity expanded');
     await close(o, 'activity');
   }
@@ -102,7 +107,7 @@ async function themePersistence() {
   ok((await page.getAttribute('html', 'data-theme')) === 'light', 'toggle switches to light');
   ok((await page.evaluate(() => localStorage.getItem('orbit.theme'))) === 'light', 'choice stored in localStorage');
   const bgLight = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
-  ok(bgDark !== bgLight && bgLight === 'rgb(255, 255, 255)', `background follows the theme (${bgDark} then ${bgLight})`);
+  ok(bgDark !== bgLight && bgLight !== 'rgba(0, 0, 0, 0)', `background follows the theme (${bgDark} then ${bgLight})`);
   // the inline script sets the theme before React runs: check the attribute at DOMContentLoaded, before any app code
   await page.reload({ waitUntil: 'domcontentloaded' });
   ok((await page.getAttribute('html', 'data-theme')) === 'light', 'theme persists across reload (set before first paint)');

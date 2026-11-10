@@ -9,10 +9,13 @@ const env = (k: string, d?: string): string => {
   return v;
 };
 const network = env('NEAR_NETWORK', 'testnet');
+const port = Number(env('MERCHANT_PORT', '8402'));
+const host = env('MERCHANT_HOST', '127.0.0.1');
 const m = createMerchant({
   vault: env('VAULT_ACCOUNT_ID'),
   merchant: env('MERCHANT_ACCOUNT_ID'),
   asset: env('TOKEN_ACCOUNT_ID'),
+  publicOrigin: env('MERCHANT_PUBLIC_ORIGIN', `http://127.0.0.1:${port}`),
   network: network === 'mainnet' ? 'near:mainnet' : 'near:testnet',
   rpc: new NearRpc(process.env.NEAR_RPC_URL ? process.env.NEAR_RPC_URL.split(',') : DEFAULT_RPC[network === 'mainnet' ? 'mainnet' : 'testnet']),
   price: env('MERCHANT_PRICE', '10000'),
@@ -20,7 +23,6 @@ const m = createMerchant({
   dbPath: env('MERCHANT_DB', 'merchant.sqlite'),
   apiUrl: process.env.API_URL || null,
 });
-const port = Number(env('MERCHANT_PORT', '8402'));
-createServer((req, res) => void m.handle(req, res)).listen(port, () => {
-  console.log(JSON.stringify({ msg: 'merchant_listening', port, demo: true }));
+createServer((req, res) => void m.handle(req, res)).listen(port, host, () => {
+  console.log(JSON.stringify({ msg: 'merchant_listening', host, port, demo: true }));
 });

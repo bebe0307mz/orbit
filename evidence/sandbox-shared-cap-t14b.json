@@ -1,0 +1,21 @@
+{
+  "kind": "orbit_local_sandbox_shared_cap_evidence",
+  "scenario": "T-14b",
+  "source": "harness/out/sandbox-t-14b.json",
+  "runner": "ORBIT_ONLY=T-14b cargo test -p orbit-sandbox-tests --test sandbox -- --nocapture",
+  "scope": "local NEAR sandbox; four independently keyed agents; one shared organization daily cap",
+  "result": {
+    "pass": 1,
+    "fail": 0,
+    "skip": 0,
+    "transactions_submitted": 20,
+    "paid": 5,
+    "rejected_over_org_daily_limit": 15,
+    "submission_window_ms": 25,
+    "all_pay_receipts_by_block": 73,
+    "first_settlement_block": 75,
+    "in_flight_polls_within_limits": 3,
+    "duration_ms": 9542
+  },
+  "limitation": "This is a preserved local sandbox result, not a live Agent Market assignment or a new run on 30 October 2026."
+}

@@ -67,8 +67,8 @@ export function Shell({ screen }: { screen: Screen }) {
   const testToken = network === 'testnet' && !!state && state.vault.token !== CIRCLE_TESTNET_USDC;
   return (
     <header className="topbar">
-      <span className="wordmark">Orbit</span>
-      <span className="org">{config.orgName}</span>
+      <span className="wordmark"><span className="brand-mark" aria-hidden="true" />Orbit</span>
+      {config.orgName.toLowerCase() !== 'orbit' ? <span className="org">{config.orgName}</span> : null}
       <span className="badges">
         <span className={'tag net' + (network === 'testnet' ? ' testnet' : '')}>
           {network === 'testnet' ? 'Testnet' : 'Mainnet'}

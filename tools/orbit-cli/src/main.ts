@@ -166,6 +166,20 @@ async function status(ctx: Ctx): Promise<boolean> {
   ctx.out(`  surplus (unaccounted token balance) ${fmtUsdc(bal - held)}; pending ${s.pending_count}`);
   for (const a of s.agents) ctx.out(agentRow(a));
   for (const m of s.merchants) ctx.out(`  merchant ${m.account} (${m.name})`);
+  const paused = new Map(s.agents.filter((a) => a.status === 'paused').map((a) => [a.id, a.name]));
+  if (paused.size && s.counts.next_seq > 0) {
+    try {
+      const recent = await ctx.rpc.view<{ entries: { agent_id: number; reason: string | null }[] }>(ctx.vault, 'outcomes', {
+        from_seq: Math.max(0, s.counts.next_seq - 100), limit: 100,
+      });
+      for (const [id, name] of paused) {
+        const attempts = recent.entries.filter((e) => e.agent_id === id && e.reason === 'agent_paused').length;
+        if (attempts) ctx.out(`  warning: paused agent ${name} tried to pay ${attempts} time${attempts === 1 ? '' : 's'} in the last 100 outcomes; revoke its key if attempts continue`);
+      }
+    } catch (e) {
+      ctx.out(`  warning: could not inspect recent payment attempts by paused agents: ${(e as Error).message}`);
+    }
+  }
   for (const [name, ok, detail] of checks) ctx.out(`  ${ok ? 'OK ' : 'BAD'} ${name}: ${detail}`);
   return checks.every((c) => c[1]);
 }

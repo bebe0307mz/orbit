@@ -8,7 +8,7 @@ import { useStore, type OpEntry, type PauseTarget } from '../lib/store';
  * Unresolved. The row shows Paused only when a snapshot does; this dialog never claims it.
  */
 export function PauseDialog({ target, onClose }: { target: PauseTarget; onClose: () => void }) {
-  const { state: s, ops, requestPause, session } = useStore();
+  const { state: s, ops, requestPause, clearOp, session } = useStore();
   const all = target === 'all';
   const live = ops[String(target)];
   // Keep the last entry: the store drops it once a snapshot shows the pause, while this dialog still says Confirmed.
@@ -26,6 +26,7 @@ export function PauseDialog({ target, onClose }: { target: PauseTarget; onClose:
   const typedRef = useRef<HTMLInputElement>(null);
   useFocusTrap(ref);
   const locked = phase === 'submitting' || phase === 'confirming';
+  const close = () => { clearOp(target); onClose(); };
 
   useEffect(() => {
     if (phase === 'confirm') (typedRef.current ?? cancelRef.current)?.focus();
@@ -37,11 +38,11 @@ export function PauseDialog({ target, onClose }: { target: PauseTarget; onClose:
       if (e.key !== 'Escape') return;
       e.preventDefault();
       e.stopPropagation();
-      if (!locked) onClose(); // Esc ignored while submitting or confirming
+      if (!locked) close(); // Esc ignored while submitting or confirming
     };
     document.addEventListener('keydown', onKey, true);
     return () => document.removeEventListener('keydown', onKey, true);
-  }, [locked, onClose]);
+  }, [locked, clearOp, onClose, target]);
 
   if (!s) return null;
   const a = all ? null : s.agents.find((x) => x.id === target);
@@ -66,7 +67,7 @@ export function PauseDialog({ target, onClose }: { target: PauseTarget; onClose:
     case 'confirm':
       buttons = (
         <>
-          <button ref={cancelRef} className="btn secondary" type="button" data-cancel onClick={onClose}>Cancel</button>
+          <button ref={cancelRef} className="btn secondary" type="button" data-cancel onClick={close}>Cancel</button>
           <button className="btn danger" type="button" data-go disabled={!canGo} onClick={go}>{label}</button>
         </>
       );
@@ -94,7 +95,7 @@ export function PauseDialog({ target, onClose }: { target: PauseTarget; onClose:
     case 'confirmed':
       announce = 'Confirmed';
       state = <span className="state op confirmed"><span className="dot" />Confirmed{link ? <> · {link}</> : null}</span>;
-      buttons = <button className="btn secondary" type="button" data-cancel onClick={onClose}>Close</button>;
+      buttons = <button className="btn secondary" type="button" data-cancel onClick={close}>Close</button>;
       break;
     case 'failed':
       announce = 'Not paused';
@@ -106,7 +107,7 @@ export function PauseDialog({ target, onClose }: { target: PauseTarget; onClose:
       );
       buttons = (
         <>
-          <button className="btn secondary" type="button" data-cancel onClick={onClose}>Close</button>
+          <button className="btn secondary" type="button" data-cancel onClick={close}>Close</button>
           {session.operator ? <button className="btn danger" type="button" data-go onClick={go}>Retry</button> : null}
         </>
       );
@@ -114,13 +115,13 @@ export function PauseDialog({ target, onClose }: { target: PauseTarget; onClose:
     case 'unresolved':
       announce = 'Not confirmed after 10 min';
       state = <span className="state op unresolved"><span className="dot" />Not confirmed after 10 min · check explorer · status below is from the chain</span>;
-      buttons = <button className="btn secondary" type="button" data-cancel onClick={onClose}>Close</button>;
+      buttons = <button className="btn secondary" type="button" data-cancel onClick={close}>Close</button>;
       break;
   }
 
   return (
     <>
-      <div className="scrim" onClick={() => !locked && onClose()} />
+      <div className="scrim" onClick={() => !locked && close()} />
       <div className="modal" role="dialog" aria-modal="true" aria-labelledby="dlgT" id="dlg" ref={ref} data-phase={phase}>
         <div className="modal-head">
           <h2 className="t-heading" id="dlgT">{all ? 'Pause all agents' : `Pause ${a!.name}`}</h2>

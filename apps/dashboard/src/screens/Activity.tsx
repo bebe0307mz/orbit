@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import {
   dateShort, explorerBase, fmtInt, fmtUsd, hhmm, hhmmss, midTrunc, reasonLabel, timeCell,
   type DashboardState, type OutcomeItem,
@@ -130,7 +130,11 @@ export function ActivityScreen({ route }: { route: Route }) {
   useEffect(() => {
     const record = () => {
       const header = document.querySelector('.topbar')?.getBoundingClientRect().bottom ?? 0;
-      const first = Array.from(document.querySelectorAll<HTMLElement>('tr.row')).find((r) => r.getBoundingClientRect().bottom > header + 1);
+      // Pending rows are replaced by settled rows with a different key. Anchor to a settled row when one is
+      // visible so the reference survives that replacement and the rows below do not jump by one row height.
+      const visible = (r: HTMLElement) => r.getBoundingClientRect().bottom > header + 1;
+      const first = Array.from(document.querySelectorAll<HTMLElement>('tr.row[data-key^="s"]')).find(visible)
+        ?? Array.from(document.querySelectorAll<HTMLElement>('tr.row')).find(visible);
       anchor.current = first && window.scrollY > 0 ? { key: first.dataset.key!, top: first.getBoundingClientRect().top } : null;
     };
     record();
@@ -147,6 +151,17 @@ export function ActivityScreen({ route }: { route: Route }) {
     setOpen((o) => ({ ...o, [k]: !o[k] }));
     setCurrent(k);
   };
+  const onRowKey = (e: ReactKeyboardEvent<HTMLTableRowElement>, k: string) => {
+    if (e.target !== e.currentTarget || (e.key !== 'Enter' && e.key !== ' ')) return;
+    e.preventDefault();
+    e.stopPropagation();
+    toggle(k);
+  };
+  const historyError = rows.error ? (
+    <div className="error-line" data-testid="history-error" role="alert">
+      <Dot cls="danger" />{rows.error} · <button className="btn link" type="button" onClick={rows.retry}>Retry</button>
+    </div>
+  ) : null;
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -177,7 +192,11 @@ export function ActivityScreen({ route }: { route: Route }) {
 
   const head = (sum?: React.ReactNode) => (
     <div className="page-head">
-      <h1 className="t-title">Activity</h1>
+      <div className="page-heading">
+        <span className="page-kicker">Payment ledger</span>
+        <h1 className="t-title">Activity</h1>
+        <p className="page-description">Follow every payment and see why a request was blocked.</p>
+      </div>
       {sum}
     </div>
   );
@@ -234,6 +253,7 @@ export function ActivityScreen({ route }: { route: Route }) {
       <main className="page act" id="page">
         {head(sum)}
         <Banners screen="activity" />
+        {historyError}
         <div className="table-wrap" data-testid="empty-activity"><div className="empty-cell">No payments yet</div></div>
       </main>
     );
@@ -259,6 +279,7 @@ export function ActivityScreen({ route }: { route: Route }) {
     <main className="page act" id="page">
       {head(sum)}
       <Banners screen="activity" />
+      {historyError}
       <nav className="views" aria-label="Status">
         {tabs.map(([k, label, n, chk]) => (
           <button key={k} className="tab" type="button" aria-current={status === k ? 'page' : undefined} onClick={() => setFilter({ status: k })}>
@@ -291,7 +312,7 @@ export function ActivityScreen({ route }: { route: Route }) {
             </tr>
           </thead>
           <tbody>
-            {!rows.pend.length && !shown.length && !rows.loading ? (
+            {!rows.pend.length && !shown.length && !rows.loading && !rows.error ? (
               <tr className="empty-row">
                 <td colSpan={6} className="empty-cell">
                   No outcomes match{' '}
@@ -303,7 +324,7 @@ export function ActivityScreen({ route }: { route: Route }) {
               const k = 'p' + x.payment_id;
               return (
                 <Fragment key={k}>
-                  <tr className={'row pend' + (open[k] ? ' open' : '') + (current === k ? ' current' : '') + (fresh.has(k) ? ' arrived' : '')} data-key={k} tabIndex={-1} aria-expanded={!!open[k]} onClick={() => toggle(k)}>
+                  <tr className={'row pend' + (open[k] ? ' open' : '') + (current === k ? ' current' : '') + (fresh.has(k) ? ' arrived' : '')} data-key={k} tabIndex={0} aria-expanded={!!open[k]} title="Press Enter for payment details" onKeyDown={(e) => onRowKey(e, k)} onClick={() => toggle(k)}>
                     <td className="c-time">reserved {hhmmss(x.reserved_at_ms)}</td>
                     <td className="c-agent truncate"><a href={hrefFor('agents', { agent: x.agent_id })} onClick={(e) => e.stopPropagation()}>{agentName(x.agent_id)}</a></td>
                     <td className="c-merch truncate"><Merch acct={x.merchant} s={s} /></td>
@@ -326,7 +347,7 @@ export function ActivityScreen({ route }: { route: Route }) {
                   {divider.map((g) => (
                     <tr className="gap-row" key={'g' + g.from_seq} data-testid="gap-row"><td colSpan={6}>#{g.from_seq} to #{g.to_seq} missing · not in the vault ring any more</td></tr>
                   ))}
-                  <tr className={'row' + (open[k] ? ' open' : '') + (current === k ? ' current' : '') + (fresh.has(k) ? ' arrived' : '')} data-key={k} tabIndex={-1} aria-expanded={!!open[k]} onClick={() => toggle(k)}>
+                  <tr className={'row' + (open[k] ? ' open' : '') + (current === k ? ' current' : '') + (fresh.has(k) ? ' arrived' : '')} data-key={k} tabIndex={0} aria-expanded={!!open[k]} title="Press Enter for payment details" onKeyDown={(e) => onRowKey(e, k)} onClick={() => toggle(k)}>
                     <td className="c-time">{timeCell(o.timestamp_ms, s.snapshot.timestamp_ms)}</td>
                     <td className="c-agent truncate"><a href={hrefFor('agents', { agent: o.agent_id })} onClick={(e) => e.stopPropagation()}>{agentName(o.agent_id)}</a></td>
                     <td className="c-merch truncate"><Merch acct={o.merchant} s={s} /></td>

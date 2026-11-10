@@ -125,14 +125,14 @@ export async function attack(cfg: AttackConfig, name: string): Promise<Record<st
 
   let replayId = await lastPaidId(cfg, agent.publicKey);
   if (!replayId) {
-    const seed = await agent.pay({ payment_id: pid(), merchant: cfg.merchant, amount: '1000', deadline_ms: deadline() });
-    line(cfg, '   (setup: one honest $0.001 payment to replay)', seed);
-    cfg.proof?.tx('setup: honest $0.001 payment to replay', seed);
+    const seed = await agent.pay({ payment_id: pid(), merchant: cfg.merchant, amount: '10000', deadline_ms: deadline() });
+    line(cfg, '   (setup: one honest $0.01 payment to replay)', seed);
+    cfg.proof?.tx('setup: honest $0.01 payment to replay', seed);
     if (seed.status !== 'paid') throw new Error('could not create a paid payment to replay');
     replayId = seed.payment_id;
   }
   const kp = loadKey(join(cfg.keyDir, `${name}.json`)).keyPair;
-  const signed = await signPay(cfg, kp, { payment_id: replayId, merchant: cfg.merchant, amount: '1000', deadline_ms: deadline() });
+  const signed = await signPay(cfg, kp, { payment_id: replayId, merchant: cfg.merchant, amount: '10000', deadline_ms: deadline() });
   const first = await cfg.rpc.sendTx(signed.b64, 'EXECUTED', 30_000);
   const parsed = parseOutcome(first, cfg.vault);
   const replay: PayOutcome =

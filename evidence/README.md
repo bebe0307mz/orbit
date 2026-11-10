@@ -1,0 +1,28 @@
+# Orbit evidence index — 30 October 2026
+
+These files are reproducible observations, not a completed NEAR Hackathon submission or proof of a live Agent Market seller job. The deployed testnet vault uses an open-mint test token with no monetary value. The four demo agents follow fixed rules; the quote feed is synthetic.
+
+## Observed runs
+
+| Evidence | What it establishes | What it does not establish |
+|---|---|---|
+| [Shared-cap sandbox T-14b](sandbox-shared-cap-t14b.json) | 20 concurrent payments from four keys against one shared cap: 5 paid, 15 rejected; all receipts settled. | An external buyer, merchant, or marketplace job; this is a local NEAR sandbox run. |
+| [Live testnet fleet demo](testnet-demo-2026-10-30.json) | 13 distinct paid purchases; 49 end-to-end checks passed, none failed; merchant balance rose by the exact paid amount; all 13 transaction hashes appeared as verified dashboard receipts. | Autonomous marketplace jobs or commercially valuable paid data. |
+| [Paid account diagnostic](testnet-account-audit-2026-10-30.json) | One real testnet vault payment for a merchant response derived from final NEAR RPC account and key reads. The final `payment(id)` is `paid` and the transaction contains matching payment events. | A marketplace assignment or third-party paid-data adoption. The underlying RPC data is public. |
+| [Receipt-link testnet purchase](testnet-receipt-link-2026-10-30.json) | A fresh 402 purchase after merchant receipt verification changed. The merchant served HTTP 200, the final vault payment is `paid`, and the signed hash resolves to a matching `payment_paid` event. | This purchase used a synthetic quote and did not pass through Agent Market. |
+| [Agents screenshot](testnet-agents-2026-10-30.png) and [Activity screenshot](testnet-activity-2026-10-30.png) | The dashboard displayed testnet fleet and payment state during the live demo. | A separate independent usability review. |
+
+## Verification status
+
+- `pnpm test`: 218 TypeScript tests passed; three external testnet tests skipped on 10 November 2026. One merchant testnet test was also run separately with a registered key and passed against the live vault on 30 October.
+- `cargo test -p orbit-sandbox-tests -- --nocapture`: 25 sandbox scenarios passed, zero failed; the optional UTC-midnight rollover scenario was skipped.
+- `pnpm check:ui:mock`: 844 checks passed, zero failed. `pnpm check:ui:live`: 91 checks passed, zero failed, including a failed Activity history request followed by a successful retry. All 60 measured contrast pairs passed. Dashboard build, seller typecheck, and `git diff --check` also passed.
+- A frozen-lockfile install in an isolated copy without `node_modules` passed 200 tests and built the dashboard earlier in the round. That clean-install copy has not been rerun after the later changes that brought the local total to 209.
+- The NEAR Agent Market seller worker uses the published assignment, start, and submit endpoints. Its tests use API-shaped fixtures and mocked payment calls. An authenticated seller poll returned HTTP 200 and zero in-progress assignments on 30 October 2026. No authenticated seller assignment, marketplace payout, or marketplace-to-Orbit-to-submission run has been observed.
+- The merchant's HTTP 402 scheme is `orbit-near`. It is x402-style and is not proven compatible with x402 v2 `exact` or Agent Market's buyer-side x402 flow.
+
+## Findings and remaining gates
+
+The initial independent architect, security, judge, and product reviews identified paid-invoice expiry, mutable transaction hashes in signed proofs, automatic proof-bearing redirects, ambiguous-payment repurchase risk, and a budget brief that ignored the daily payment-count cap. Those were changed and regression-tested. A later independent UX review scored the dashboard 7/10 and demo clarity 5.5/10; an integration review scored integration 5/10 and reliability 6/10. Their Activity error-state, keyboard access, duplicate-worker, and unknown-account-payment findings were addressed with regression checks. The merchant checks the signed transaction hash against the final vault `payment_paid` event; a live testnet purchase passed with this check. The seller uses an exclusive state-file lock, bounds merchant requests to 15 seconds, continues past an individual assignment failure, resumes a known paid invoice with its original proof, and holds ambiguous outcomes for manual reconciliation. These changes have fixture tests; there is still no live marketplace assignment proof.
+
+Before claiming the seller workflow is live, capture an Agent Market assignment ID, a final Orbit payment ID and transaction hash, the paid diagnostic response, and the marketplace submission receipt from one authenticated run. After the November 1 hackathon start, the submission also needs the public repository, license, public X demo post, and any required disclosure. See the [official instructions](https://nearhackathon.com/HACKATHON.md) for current rules; this paragraph is a preparation checklist, not a claim that those steps are complete.

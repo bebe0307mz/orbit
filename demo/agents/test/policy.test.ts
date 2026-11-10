@@ -83,7 +83,8 @@ describe('reacting to rejections: never a blind retry', () => {
   it('unknown outcomes and refused invoices are not re-paid', () => {
     const g = newGuard();
     react(g, { kind: 'unknown' }, 'NEAR', T);
-    expect(gate(g, 'NEAR', T + 10_000, null, 1n)).toMatchObject({ kind: 'wait' });
+    expect(gate(g, 'NEAR', T + 10_000, null, 1n)).toMatchObject({ kind: 'stop' });
+    expect(gate(g, 'NEAR', T + 60_000, null, 1n)).toMatchObject({ kind: 'stop' });
     const g2 = newGuard();
     react(g2, { kind: 'refused_invoice', why: 'invoice amount 200000 above maxAmount 20000' }, 'NEAR', T);
     expect(gate(g2, 'NEAR', T + 60_000, null, 1n)).toMatchObject({ kind: 'wait' });

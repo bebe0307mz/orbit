@@ -205,9 +205,8 @@ export function react(g: GuardState, o: Outcome, symbol: string, now: number): s
       g.blockedWhy = o.reason ?? 'not_executed';
       return 'transaction not executed: waiting 30s before a new invoice';
     case 'unknown':
-      g.blockedUntil = now + 30_000;
-      g.blockedWhy = 'unknown';
-      return 'outcome unknown: not paying again for this invoice, waiting 30s';
+      g.stopped = 'payment outcome unknown: reconcile the payment_id before any new purchase';
+      return `stopping: ${g.stopped}`;
     case 'expired_unpaid':
       return 'invoice expired unpaid: nothing was spent';
     case 'refused_invoice':

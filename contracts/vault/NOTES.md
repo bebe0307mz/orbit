@@ -28,7 +28,7 @@ Builds: `scripts/build-contracts.sh` (cargo-near 0.22, rust 1.86, near-sdk 5.27)
 
 ## View shape changes (for Builder B)
 
-- Final `state()` shape: `{block_height, timestamp_ms, day, version, owner, guardian_pk, near: {balance (U128 string, yocto), storage_usage (number)}, token, float_cap, available, reserved, deposited_total, withdrawn_total, paid_total, org: {daily_limit, spent_today, reserved, paused}, counts: {paid, failed, rejected, next_seq}, agents: [{id, name, pk, status, per_payment_limit, daily_limit, spent_today, reserved, remaining_today, paid_count, rejected_count, failed_count}], merchants: [{account, name}], pending: [{payment_id, agent_id, merchant, amount, reserved_at_ms}], pending_count}`. Amounts are U128 decimal strings; counts, ids, heights and ms are numbers.
+- Final `state()` shape: `{block_height, timestamp_ms, day, version, owner, guardian_pk, near: {balance (U128 string, yocto), storage_usage (number)}, token, float_cap, available, reserved, deposited_total, withdrawn_total, paid_total, org: {daily_limit, spent_today, reserved, paused}, counts: {paid, failed, rejected, next_seq}, agents: [{id, name, pk, status, per_payment_limit, daily_limit, spent_today, reserved, remaining_today, paid_count, rejected_count, failed_count, max_payments_per_day, payments_today}], merchants: [{account, name}], pending: [{payment_id, agent_id, merchant, amount, reserved_at_ms}], pending_count}`. Amounts are U128 decimal strings; counts, ids, heights and ms are numbers.
 - `state()` adds two top-level fields: `owner` (account id) and `guardian_pk` (`ed25519:...`). Everything else matches 3-contract.md.
 - Events: NEP-297 `EVENT_JSON:{"standard":"orbit-vault","version":"1.0.0","event":...,"data":[{...}]}`; `data` is a one-element array. `payment_paid|failed|rejected` data: `payment_id, agent_id, merchant, amount, seq, reason` (`reason` null for paid). `deposited` data: `sender_id, accepted, refunded`.
 - `payment(id)` with a malformed id panics `E_ARGS` (unknown well-formed id returns null).
@@ -40,12 +40,13 @@ Vault `orbit-vault-fkuc.testnet`, owner `orbit-owner-fkuc.testnet`, token `orbit
 ## Mainnet readiness checklist (nothing deployed)
 
 Must be true first:
-- [ ] `scripts/test-contracts.sh` green (22 unit, sandbox PASS 22 FAIL 0), plus `ORBIT_MIDNIGHT=1` sandbox T-12 green once (passed 2026-10-20: P1 reserved 2.5 s before UTC midnight, settled 0.3 s after, committed to d+1).
-- [ ] Testnet: `scripts/testnet-proof.sh` and `pnpm demo:attack --agent <name>` / `--burst` green on a vault deployed from the same commit (the fkuc testnet vaults run an earlier build, code_hash `4LRJE2Wt...`).
-- [ ] Mainnet build: `scripts/build-contracts.sh` writes `target/near/orbit_vault/orbit_vault_mainnet.wasm` (`--features mainnet`; sandbox MAINNET-GUARD checks it). That build pins Circle USDC `17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1` and refuses `float_cap > 20 USDC` in `new`. Record its sha256 and base58 code hash in the README before deploying.
+- [x] Current build: 25 unit tests and sandbox PASS 24, FAIL 0, SKIP 1.
+- [x] The optional `ORBIT_MIDNIGHT=1` T-12 scenario passed on this build (2026-10-22): a payment reserved 1.869 seconds before UTC midnight settled 0.934 seconds after it and counted toward the new day's limit; the next payment was rejected for exceeding that limit.
+- [x] Testnet: `orbit-demo-codex-22-vault.testnet` uses the current contract hash `HJy2AsaiWrSTPp8PU7sCRGoYqdtLHervCnpawKx3eUm`. Four autonomous agents made 15 paid purchases in a four-minute run with 47 end-to-end checks passing. `pnpm demo:attack --agent rogue-agent` and `--burst` passed; the burst recorded 5 paid and 15 rejected with no missing attempts. The older `scripts/testnet-proof.sh` run used a prior build.
+- [x] Mainnet build: `scripts/build-contracts.sh` wrote `target/near/orbit_vault/orbit_vault_mainnet.wasm` (`--features mainnet`); sandbox MAINNET-GUARD passed. It pins Circle USDC `17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1` and refuses `float_cap > 20 USDC` in `new`. Its SHA-256 and base58 code hash are in the README; verify them again before deploying.
 - [ ] Circle USDC behavior (E4, S-2 mainnet): one tiny payment to a merchant that is not registered on USDC must settle `failed:transfer_failed` with a full refund. Do it once, right after deploy, with an extra demo agent and merchant you then remove.
 - [ ] Guardian key generated on the API VM (`pnpm api keygen`); only its public key comes to the founder machine.
-- [ ] Demo copy updated: a re-broadcast returns the original outcome, it is not "refused by RPC".
+- [x] Demo copy updated: a re-broadcast returns the original outcome, it is not "refused by RPC".
 
 Accounts (founder creates):
 - `orbit-vault.<team>.near`, funded with 10 NEAR, with one full-access deploy key K0 on the founder machine.

@@ -19,6 +19,7 @@ import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { keygen, loadKey, NearRpc } from '@orbit/agent';
+import { baseEncode } from '@near-js/utils';
 import { DEFAULT_RPC, type VaultState } from '@orbit/vault-types';
 import { JOBS } from './policy.ts';
 
@@ -138,10 +139,11 @@ const git = (...args: string[]) => execFileSync('git', args, { cwd: REPO, encodi
  * rebuilds when the contracts' last commit differs from the one the current build was made from.
  */
 function contracts(): { vault: string; token: string; commit: string } {
-  if (git('status', '--porcelain', '--', 'contracts') && process.env.DEMO_ALLOW_DIRTY_CONTRACTS !== '1') {
-    throw new Error('contracts/ has uncommitted changes; the demo vault is deployed only from committed code (DEMO_ALLOW_DIRTY_CONTRACTS=1 to override)');
+  const buildInputs = ['Cargo.toml', 'Cargo.lock', 'contracts/vault/Cargo.toml', 'contracts/vault/src', 'contracts/mock-ft/Cargo.toml', 'contracts/mock-ft/src'];
+  if (git('status', '--porcelain', '--', ...buildInputs) && process.env.DEMO_ALLOW_DIRTY_CONTRACTS !== '1') {
+    throw new Error('contract build inputs have uncommitted changes; the demo vault is deployed only from committed code (DEMO_ALLOW_DIRTY_CONTRACTS=1 to override)');
   }
-  const commit = git('log', '-1', '--format=%H', '--', 'contracts');
+  const commit = git('log', '-1', '--format=%H', '--', ...buildInputs);
   const dir = join(REPO, 'target/near');
   const vault = join(dir, 'orbit_vault/orbit_vault.wasm');
   const token = join(dir, 'mock_ft/mock_ft.wasm');
@@ -178,8 +180,12 @@ async function main() {
   chmodSync(guardianFile, 0o600);
   const guardianPk = loadKey(guardianFile).keyPair.getPublicKey().toString();
 
-  if (await hasCode(acct.vault)) log(`vault ${acct.vault}: deployed`);
-  else await orbitCli(['deploy', '--guardian-pk', guardianPk, '--float-cap', FLOAT_CAP, '--org-daily', ORG_DAILY, '--wasm', wasm.vault]);
+  if (await hasCode(acct.vault)) {
+    const onChain = (await account(acct.vault))!.code_hash;
+    const expected = baseEncode(createHash('sha256').update(readFileSync(wasm.vault)).digest());
+    if (onChain !== expected) throw new Error(`vault ${acct.vault} runs code ${onChain}, but the current contract is ${expected}; use a fresh DEMO_TAG for this build`);
+    log(`vault ${acct.vault}: deployed with current contract`);
+  } else await orbitCli(['deploy', '--guardian-pk', guardianPk, '--float-cap', FLOAT_CAP, '--org-daily', ORG_DAILY, '--wasm', wasm.vault]);
   let s = await vaultState();
   if (s.guardian_pk !== guardianPk) throw new Error(`vault guardian ${s.guardian_pk} is not ${guardianPk}`);
 

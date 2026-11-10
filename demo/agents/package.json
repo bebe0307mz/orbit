@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@near-js/utils": "2.5.1",
     "@orbit/agent": "workspace:*",
     "@orbit/vault-types": "workspace:*"
   },

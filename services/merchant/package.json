@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Orbit demo merchant (demo data API): issues orbit-near 402 invoices and verifies payments on the vault before serving",
+  "description": "Orbit demo merchant: issues orbit-near 402 invoices for synthetic quotes and on-chain budget briefs, then verifies vault payments",
   "scripts": {
     "start": "node --experimental-strip-types --no-warnings=ExperimentalWarning src/main.ts",
     "test": "vitest run",

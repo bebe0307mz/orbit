@@ -1,6 +1,6 @@
 export { OrbitAgent, PAY_GAS, MAX_DEADLINE_WINDOW_MS, isPaymentId, proofMessage, parseOutcome, seqFromLogs } from './agent.ts';
-export type { AgentOptions, PayOutcome, PayRequest, PayStatus } from './agent.ts';
-export { orbitFetch, checkInvoice, encodeProof, decodeProof, InvoiceError, SCHEME } from './fetch.ts';
+export type { AgentOptions, PayOutcome, PayRequest, PayStatus, ProofFields } from './agent.ts';
+export { orbitFetch, checkInvoice, encodeProof, decodeProof, InvoiceError, requestResource, SCHEME } from './fetch.ts';
 export type { Invoice, OrbitFetchOptions, OrbitFetchResult, PaymentProof } from './fetch.ts';
 export { keygen, loadKey, KeyFileError } from './keys.ts';
 export type { KeyFile } from './keys.ts';

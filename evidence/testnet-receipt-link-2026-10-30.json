@@ -1,0 +1,23 @@
+{
+  "kind": "orbit_testnet_receipt_link_evidence",
+  "observed_date": "2026-10-30",
+  "network": "near:testnet",
+  "token": "orbit-demo-codex-22-token.testnet",
+  "token_value": "open-mint test token; no monetary value",
+  "marketplace_integration": "not exercised in this run",
+  "resource": "GET /v1/quote?symbol=NEAR",
+  "resource_behavior": "synthetic demo quote",
+  "test_command": "ORBIT_TESTNET=1 pnpm --filter @orbit/merchant exec vitest run test/testnet.test.ts (with existing private demo environment and a registered agent key)",
+  "test_result": "1 passed; HTTP 200 paid resource; merchant token balance rose by the 10000 base-unit price",
+  "vault": "orbit-demo-codex-22-vault.testnet",
+  "merchant": "orbit-demo-codex-22-merchant.testnet",
+  "payment_id": "7553a01189622d017e47c3a865e2ab641407475e4cd01a84145aa14959780954",
+  "tx_hash": "2rrR7nPYD69RyaYGtQB7VDf3SMm9235Q6oBpCYdfinAt",
+  "explorer_url": "https://testnet.nearblocks.io/txns/2rrR7nPYD69RyaYGtQB7VDf3SMm9235Q6oBpCYdfinAt",
+  "payment_status_at_final": "paid",
+  "amount_base_units": "10000",
+  "payment_view_block": 275384940,
+  "transaction_final_status": "FINAL",
+  "matching_payment_paid_events": 1,
+  "limitation": "The seller marketplace workflow and real external paid data were not involved."
+}

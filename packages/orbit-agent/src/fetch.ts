@@ -2,7 +2,10 @@
 //
 // 402 body: {scheme: "orbit-near", network, vault, merchant, amount, asset, payment_id, deadline_ms, resource}.
 // Retry header: X-PAYMENT = base64url(JSON {payment_id, tx_hash, agent_pk, sig}), sig = base64 ed25519 over
-// UTF-8 "orbit-near:v1:<payment_id>:<resource>".
+// UTF-8 "orbit-near:v3:<merchant>:<origin>:<payment_id>:<tx_hash>:<resource>".
+// Origin binding: the invoice `resource` must be "<METHOD> <full URL>" of the request the agent made, and
+// `originMerchants` requires the invoice merchant to be the one mapped to that origin. A site cannot hand the agent another
+// merchant's invoice.
 import { isPaymentId, MAX_DEADLINE_WINDOW_MS, type OrbitAgent, type PayOutcome } from './agent.ts';
 
 export const SCHEME = 'orbit-near';
@@ -29,12 +32,18 @@ export interface PaymentProof {
 export interface OrbitFetchOptions {
   /** Largest amount (base units) this call may pay. Required: the SDK never pays an unbounded invoice. */
   maxAmount: string | bigint;
-  /** Expected token account id; when set, an invoice for another asset is refused. */
-  asset?: string;
+  /** Expected token account id. An invoice for another asset is refused. */
+  asset: string;
   /** Allowed merchant accounts; when set, other merchants are refused before paying. */
   merchants?: string[];
+  /** Origin -> merchant account. A request to an unmapped origin, or an invoice naming another merchant, is refused. */
+  originMerchants: Record<string, string>;
   /** How many times to retry while the merchant answers payment_pending (default 5). */
   pendingRetries?: number;
+  /** Called after validating the invoice and before signing or sending payment. Throwing prevents payment. */
+  onInvoice?: (invoice: Invoice) => void | Promise<void>;
+  /** Called after the pay outcome is known and before retrying the merchant. */
+  onPayment?: (invoice: Invoice, payment: PayOutcome) => void | Promise<void>;
   fetchImpl?: typeof fetch;
   sleep?: (ms: number) => Promise<void>;
   now?: () => number;
@@ -66,19 +75,29 @@ export function decodeProof(header: string): PaymentProof {
 }
 
 /** Validates a 402 body against the agent and the caller's bounds. Throws InvoiceError with the reason. */
-export function checkInvoice(body: unknown, agent: Pick<OrbitAgent, 'vault' | 'network'>, opts: OrbitFetchOptions, nowMs: number): Invoice {
+/** "<METHOD> <normalized full URL>" for a request, the form an invoice `resource` must have. */
+export function requestResource(input: string | URL, init: RequestInit = {}): string {
+  return `${(init.method ?? 'GET').toUpperCase()} ${new URL(String(input)).href}`;
+}
+
+export function checkInvoice(body: unknown, agent: Pick<OrbitAgent, 'vault' | 'network'>, opts: OrbitFetchOptions, nowMs: number, requested: string): Invoice {
   const inv = body as Partial<Invoice>;
   if (!inv || inv.scheme !== SCHEME) throw new InvoiceError(`unsupported scheme ${String(inv?.scheme)}`);
   if (inv.network !== agent.network) throw new InvoiceError(`invoice network ${String(inv.network)} is not ${agent.network}`);
   if (inv.vault !== agent.vault) throw new InvoiceError(`invoice vault ${String(inv.vault)} is not ${agent.vault}`);
   if (typeof inv.merchant !== 'string' || !inv.merchant) throw new InvoiceError('invoice has no merchant');
   if (opts.merchants && !opts.merchants.includes(inv.merchant)) throw new InvoiceError(`merchant ${inv.merchant} not allowed by caller`);
-  if (opts.asset && inv.asset !== opts.asset) throw new InvoiceError(`invoice asset ${String(inv.asset)} is not ${opts.asset}`);
+  if (!opts.asset || inv.asset !== opts.asset) throw new InvoiceError(`invoice asset ${String(inv.asset)} is not ${opts.asset}`);
   if (typeof inv.amount !== 'string' || !/^[0-9]{1,30}$/.test(inv.amount)) throw new InvoiceError('invoice amount must be a base-unit string');
   if (BigInt(inv.amount) > BigInt(opts.maxAmount)) throw new InvoiceError(`invoice amount ${inv.amount} above maxAmount ${opts.maxAmount}`);
   if (typeof inv.payment_id !== 'string' || !isPaymentId(inv.payment_id)) throw new InvoiceError('invoice payment_id must be 64 lowercase hex');
   if (typeof inv.deadline_ms !== 'number' || inv.deadline_ms < nowMs || inv.deadline_ms > nowMs + MAX_DEADLINE_WINDOW_MS) throw new InvoiceError('invoice deadline outside the 600 s window');
   if (typeof inv.resource !== 'string' || !inv.resource) throw new InvoiceError('invoice has no resource');
+  if (inv.resource !== requested) throw new InvoiceError(`invoice resource ${inv.resource} is not the request ${requested}`);
+  const origin = new URL(requested.slice(requested.indexOf(' ') + 1)).origin;
+  const want = opts.originMerchants?.[origin];
+  if (!want) throw new InvoiceError(`origin ${origin} has no configured merchant`);
+  if (inv.merchant !== want) throw new InvoiceError(`origin ${origin} belongs to ${want}, invoice names ${inv.merchant}`);
   return inv as Invoice;
 }
 
@@ -90,16 +109,19 @@ export async function orbitFetch(agent: OrbitAgent, input: string | URL, init: R
   const f = opts.fetchImpl ?? fetch;
   const sleep = opts.sleep ?? ((ms: number) => new Promise((r) => setTimeout(r, ms)));
   const now = opts.now ?? Date.now;
-  const first = await f(input, init);
+  const first = await f(input, { ...init, redirect: 'manual' });
+  if (first.status >= 300 && first.status < 400) return { response: first, invoice: null, payment: null, error: 'redirect_not_allowed' };
   if (first.status !== 402) return { response: first, invoice: null, payment: null, error: null };
 
   let invoice: Invoice;
   try {
-    invoice = checkInvoice(await first.clone().json(), agent, opts, now());
+    invoice = checkInvoice(await first.clone().json(), agent, opts, now(), requestResource(input, init));
   } catch (e) {
     return { response: first, invoice: null, payment: null, error: (e as Error).message };
   }
+  await opts.onInvoice?.(invoice);
   const payment = await agent.pay({ payment_id: invoice.payment_id, merchant: invoice.merchant, amount: invoice.amount, deadline_ms: invoice.deadline_ms });
+  await opts.onPayment?.(invoice, payment);
   if (payment.status !== 'paid' || !payment.tx_hash) {
     return { response: first, invoice, payment, error: `payment ${payment.status}${payment.reason ? ': ' + payment.reason : ''}` };
   }
@@ -107,14 +129,15 @@ export async function orbitFetch(agent: OrbitAgent, input: string | URL, init: R
     payment_id: invoice.payment_id,
     tx_hash: payment.tx_hash,
     agent_pk: agent.publicKey,
-    sig: agent.signProof(invoice.payment_id, invoice.resource),
+    sig: agent.signProof({ merchant: invoice.merchant, origin: new URL(String(input)).origin, payment_id: invoice.payment_id, tx_hash: payment.tx_hash, resource: invoice.resource }),
   });
   const headers = new Headers(init.headers);
   headers.set('X-PAYMENT', proof);
   const retries = opts.pendingRetries ?? 5;
   let res: Response = first;
   for (let i = 0; i <= retries; i++) {
-    res = await f(input, { ...init, headers });
+    res = await f(input, { ...init, headers, redirect: 'manual' });
+    if (res.status >= 300 && res.status < 400) return { response: res, invoice, payment, error: 'redirect_not_allowed' };
     if (res.status !== 402) break;
     const code = await res.clone().json().then((b: unknown) => (b as { error?: { code?: string } })?.error?.code, () => undefined);
     if (code !== 'payment_pending' || i === retries) {

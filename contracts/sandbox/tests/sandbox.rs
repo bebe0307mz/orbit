@@ -535,6 +535,14 @@ async fn t14(w: &Worker<Sandbox>) -> Result<String> {
     burst(&env, &[(1, 10), (2, 10), (3, 10), (4, 10)], 1_000_000, 500_000, 10, "over_org_daily_limit").await
 }
 
+/// T-14b: judge-facing fleet proof: 20 simultaneous $0.05 pays from four agents
+/// against one $0.25 organization budget. The burst helper checks merchant FT balance,
+/// final vault accounting, rejection reasons, and in-flight exposure on every poll.
+async fn t14b(w: &Worker<Sandbox>) -> Result<String> {
+    let env = Env::new(w, "t14b", Cfg { daily: 1_000_000, org: 250_000, ..Cfg::default() }).await?;
+    burst(&env, &[(1, 5), (2, 5), (3, 5), (4, 5)], 1_000_000, 250_000, 5, "over_org_daily_limit").await
+}
+
 /// T-15: agent and org limits together: daily 0.25 each, org 0.60: exactly 12 paid, each agent at most 5.
 async fn t15(w: &Worker<Sandbox>) -> Result<String> {
     let env = Env::new(w, "t15", Cfg { org: 600_000, ..Cfg::default() }).await?;
@@ -1305,6 +1313,7 @@ async fn harness() -> Result<()> {
         ("S-1e", "allowance", |w| Box::pin(s1e_allowance(w))),
         ("T-13", "I1 burst", |w| Box::pin(t13(w))),
         ("T-14", "I2 burst", |w| Box::pin(t14(w))),
+        ("T-14b", "I2 org 20x", |w| Box::pin(t14b(w))),
         ("T-15", "I1 I2 burst", |w| Box::pin(t15(w))),
         ("T-25/T-26", "I10", |w| Box::pin(t25_t26(w))),
         ("T-21", "I6 I11 agent", |w| Box::pin(t21(w))),

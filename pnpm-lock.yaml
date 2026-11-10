@@ -41,6 +41,9 @@ importers:
 
   demo/agents:
     dependencies:
+      '@near-js/utils':
+        specifier: 2.5.1
+        version: 2.5.1(@near-js/types@2.5.1)
       '@orbit/agent':
         specifier: workspace:*
         version: link:../../packages/orbit-agent

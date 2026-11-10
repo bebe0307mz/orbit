@@ -16,20 +16,22 @@ describe.skipIf(!live)('testnet: agent pays merchant through the vault', () => {
   const price = '10000';
 
   beforeAll(async () => {
-    const m = createMerchant({
-      vault: env('VAULT_ACCOUNT_ID'), merchant: env('MERCHANT_ACCOUNT_ID'), asset: env('TOKEN_ACCOUNT_ID'), network: 'near:testnet',
-      rpc, price, invoiceTtlMs: 120_000, dbPath: ':memory:', apiUrl: null,
-    });
-    server = createServer((q, r) => void m.handle(q, r));
+    let handler: ReturnType<typeof createMerchant>['handle'] = async () => {};
+    server = createServer((q, r) => void handler(q, r));
     await new Promise<void>((r) => server.listen(0, r));
     base = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
+    const m = createMerchant({
+      vault: env('VAULT_ACCOUNT_ID'), merchant: env('MERCHANT_ACCOUNT_ID'), asset: env('TOKEN_ACCOUNT_ID'), network: 'near:testnet',
+      rpc, price, invoiceTtlMs: 120_000, dbPath: ':memory:', apiUrl: null, publicOrigin: base,
+    });
+    handler = m.handle;
   });
   afterAll(() => new Promise<void>((r) => server.close(() => r())));
 
   it('pays once, serves once, merchant balance rises by the price', async () => {
     const agent = new OrbitAgent({ vault: env('VAULT_ACCOUNT_ID'), rpc, key: env('ORBIT_AGENT_KEY') });
     const before = BigInt(await rpc.view<string>(env('TOKEN_ACCOUNT_ID'), 'ft_balance_of', { account_id: env('MERCHANT_ACCOUNT_ID') }));
-    const r = await orbitFetch(agent, `${base}/v1/quote?symbol=NEAR`, {}, { maxAmount: '50000', asset: env('TOKEN_ACCOUNT_ID'), merchants: [env('MERCHANT_ACCOUNT_ID')] });
+    const r = await orbitFetch(agent, `${base}/v1/quote?symbol=NEAR`, {}, { maxAmount: '50000', asset: env('TOKEN_ACCOUNT_ID'), merchants: [env('MERCHANT_ACCOUNT_ID')], originMerchants: { [base]: env('MERCHANT_ACCOUNT_ID') } });
     console.log('orbitFetch', r.response.status, JSON.stringify(r.payment), `https://testnet.nearblocks.io/txns/${r.payment?.tx_hash}`);
     expect(r.payment?.status).toBe('paid');
     expect(r.response.status).toBe(200);

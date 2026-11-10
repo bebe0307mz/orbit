@@ -197,6 +197,9 @@ const summary = summaryFile && existsSync(summaryFile) ? JSON.parse(readFileSync
 for (const c of summary?.checks ?? []) ok(c.ok, `chain: ${c.check} (${c.detail})`);
 const purchases = proofDir ? JSON.parse(readFileSync(join(OUT, '..', proofDir, 'purchases.json'), 'utf8')) : [];
 const paidIds = new Set(purchases.filter((p) => p.status === 'paid').map((p) => p.payment_id));
+const demoEvents = existsSync(demoLog) ? readFileSync(demoLog, 'utf8').split('\n').filter(Boolean).map((line) => JSON.parse(line)) : [];
+ok(purchases.some((p) => p.agent === 'research-scout' && p.symbol === 'BUDGET' && p.status === 'paid'), 'research-scout paid for the on-chain budget brief');
+ok(demoEvents.some((e) => e.agent === 'research-scout' && /^budget says (continue|hold):/.test(e.text)), 'research-scout used the paid budget decision');
 
 /* ---------- dashboard ---------- */
 const uiChecks = [];

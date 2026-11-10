@@ -146,7 +146,7 @@ describe('keys', () => {
 describe('orbitFetch()', () => {
   const merchant = 'm.testnet';
   function invoice(chain: FakeChain, over: Record<string, unknown> = {}) {
-    return { scheme: 'orbit-near', network: 'near:testnet', vault: chain.vault, merchant, amount: '50000', asset: 'otusd.testnet', payment_id: pid(9), deadline_ms: Date.now() + 120_000, resource: 'GET /v1/quote', ...over };
+    return { scheme: 'orbit-near', network: 'near:testnet', vault: chain.vault, merchant, amount: '50000', asset: 'otusd.testnet', payment_id: pid(9), deadline_ms: Date.now() + 120_000, resource: 'GET http://shop/x', ...over };
   }
 
   it('pays a 402 once and retries with a verifiable X-PAYMENT', async () => {
@@ -158,17 +158,23 @@ describe('orbitFetch()', () => {
       if (!String(input).startsWith('http://shop')) return chain.fetch(input, init);
       calls++;
       const h = new Headers(init?.headers).get('X-PAYMENT');
-      if (!h) return new Response(JSON.stringify(invoice(chain)), { status: 402 });
+      if (!h) return new Response(JSON.stringify(invoice(chain, { resource: 'GET http://shop/v1/quote' })), { status: 402 });
       seenProof = decodeProof(h);
-      const ok = PublicKey.fromString(seenProof.agent_pk).verify(new TextEncoder().encode(proofMessage(seenProof.payment_id, 'GET /v1/quote')), Buffer.from(seenProof.sig, 'base64'));
+      const ok = PublicKey.fromString(seenProof.agent_pk).verify(new TextEncoder().encode(proofMessage({ merchant, origin: 'http://shop', payment_id: seenProof.payment_id, tx_hash: seenProof.tx_hash, resource: 'GET http://shop/v1/quote' })), Buffer.from(seenProof.sig, 'base64'));
       return ok ? new Response('{"price":1}', { status: 200 }) : new Response('{}', { status: 402 });
     };
-    const r = await orbitFetch(a, 'http://shop/v1/quote', {}, { maxAmount: '100000', asset: 'otusd.testnet', fetchImpl: f });
+    const phases: string[] = [];
+    const r = await orbitFetch(a, 'http://shop/v1/quote', {}, {
+      maxAmount: '100000', asset: 'otusd.testnet', originMerchants: { 'http://shop': merchant }, fetchImpl: f,
+      onInvoice: (inv) => { expect(chain.sent).toHaveLength(0); phases.push(`invoice:${inv.payment_id}`); },
+      onPayment: (inv, outcome) => { expect(chain.sent).toHaveLength(1); phases.push(`payment:${inv.payment_id}:${outcome.status}`); },
+    });
     expect(r.response.status).toBe(200);
     expect(r.payment?.status).toBe('paid');
     expect(calls).toBe(2);
     expect(seenProof!.tx_hash).toBe(chain.sent[0]!.hash);
     expect(chain.sent).toHaveLength(1);
+    expect(phases).toEqual([`invoice:${pid(9)}`, `payment:${pid(9)}:paid`]);
   });
 
   it('retries on payment_pending with Retry-After', async () => {
@@ -179,9 +185,26 @@ describe('orbitFetch()', () => {
       if (!new Headers(init?.headers).get('X-PAYMENT')) return new Response(JSON.stringify(invoice(chain)), { status: 402 });
       return ++n < 3 ? new Response(JSON.stringify({ error: { code: 'payment_pending' } }), { status: 402, headers: { 'retry-after': '0' } }) : new Response('ok');
     };
-    const r = await orbitFetch(agent(chain), 'http://shop/x', {}, { maxAmount: 100000n, fetchImpl: f, sleep: noSleep });
+    const r = await orbitFetch(agent(chain), 'http://shop/x', {}, { maxAmount: 100000n, asset: 'otusd.testnet', originMerchants: { 'http://shop': merchant }, fetchImpl: f, sleep: noSleep });
     expect(r.response.status).toBe(200);
     expect(chain.sent).toHaveLength(1);
+  });
+
+  it('never follows an HTTP redirect before paying or while sending proof', async () => {
+    const chain = new FakeChain();
+    const a = agent(chain);
+    const calls: RequestInit[] = [];
+    const f: typeof fetch = async (input, init) => {
+      if (!String(input).startsWith('http://shop')) return chain.fetch(input, init);
+      calls.push(init ?? {});
+      if (calls.length === 1) return new Response(JSON.stringify(invoice(chain)), { status: 402 });
+      return new Response(null, { status: 302, headers: { location: 'https://evil.example/steal' } });
+    };
+    const r = await orbitFetch(a, 'http://shop/x', {}, { maxAmount: '100000', asset: 'otusd.testnet', originMerchants: { 'http://shop': merchant }, fetchImpl: f });
+    expect(r.error).toBe('redirect_not_allowed');
+    expect(r.payment?.status).toBe('paid');
+    expect(calls).toHaveLength(2);
+    expect(calls.every((x) => x.redirect === 'manual')).toBe(true);
   });
 
   it('refuses invoices outside the caller bounds without paying', async () => {
@@ -199,12 +222,29 @@ describe('orbitFetch()', () => {
       { merchant: 'stranger.testnet' },
     ];
     for (const over of bad) {
-      expect(() => checkInvoice(invoice(chain, over), a, { maxAmount: '100000', asset: 'otusd.testnet', merchants: [merchant] }, now)).toThrow();
+      expect(() => checkInvoice(invoice(chain, over), a, { maxAmount: '100000', asset: 'otusd.testnet', merchants: [merchant], originMerchants: { 'http://shop': merchant } }, now, 'GET http://shop/x')).toThrow();
     }
     const f: typeof fetch = async () => new Response(JSON.stringify(invoice(chain, { amount: '999999' })), { status: 402 });
-    const r = await orbitFetch(a, 'http://shop/x', {}, { maxAmount: '100000', fetchImpl: f });
+    const r = await orbitFetch(a, 'http://shop/x', {}, { maxAmount: '100000', asset: 'otusd.testnet', originMerchants: { 'http://shop': merchant }, fetchImpl: f });
     expect(r.payment).toBeNull();
     expect(r.error).toMatch(/maxAmount/);
+    expect(chain.sent).toHaveLength(0);
+  });
+
+  it('refuses an invoice for another URL or a merchant not mapped to the requested origin', async () => {
+    const chain = new FakeChain();
+    const a = agent(chain);
+    const f: typeof fetch = async () => new Response(JSON.stringify(invoice(chain, { resource: 'GET http://shop/other' })), { status: 402 });
+    const wrongResource = await orbitFetch(a, 'http://shop/x', {}, { maxAmount: '100000', asset: 'otusd.testnet', originMerchants: { 'http://shop': merchant }, fetchImpl: f });
+    expect(wrongResource.error).toMatch(/invoice resource/);
+    expect(wrongResource.payment).toBeNull();
+    const good: typeof fetch = async () => new Response(JSON.stringify(invoice(chain)), { status: 402 });
+    const wrongMerchant = await orbitFetch(a, 'http://shop/x', {}, { maxAmount: '100000', asset: 'otusd.testnet', fetchImpl: good, originMerchants: { 'http://shop': 'another.testnet' } });
+    expect(wrongMerchant.error).toMatch(/belongs to another.testnet/);
+    expect(wrongMerchant.payment).toBeNull();
+    const unmapped = await orbitFetch(a, 'http://shop/x', {}, { maxAmount: '100000', asset: 'otusd.testnet', fetchImpl: good, originMerchants: {} });
+    expect(unmapped.error).toMatch(/has no configured merchant/);
+    expect(unmapped.payment).toBeNull();
     expect(chain.sent).toHaveLength(0);
   });
 
@@ -217,7 +257,7 @@ describe('orbitFetch()', () => {
       calls++;
       return new Response(JSON.stringify(invoice(chain)), { status: 402 });
     };
-    const r = await orbitFetch(agent(chain), 'http://shop/x', {}, { maxAmount: '100000', fetchImpl: f });
+    const r = await orbitFetch(agent(chain), 'http://shop/x', {}, { maxAmount: '100000', asset: 'otusd.testnet', originMerchants: { 'http://shop': merchant }, fetchImpl: f });
     expect(r.payment).toMatchObject({ status: 'rejected', reason: 'agent_paused' });
     expect(r.response.status).toBe(402);
     expect(calls).toBe(1);

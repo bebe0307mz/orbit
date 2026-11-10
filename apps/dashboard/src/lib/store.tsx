@@ -145,7 +145,8 @@ export function StoreProvider({ source, pollMs, children }: { source: VaultSourc
     })();
   }, [source, state, nextSeq]);
 
-  // An op is done once a snapshot shows the pause (UI-3).
+  // A final snapshot is sufficient to show the pause succeeded. Keep the entry until the dialog closes,
+  // so it cannot remain stuck on Confirming after the row has already changed to Paused.
   useEffect(() => {
     if (!state) return;
     setOps((prev) => {
@@ -153,8 +154,8 @@ export function StoreProvider({ source, pollMs, children }: { source: VaultSourc
       const next = { ...prev };
       for (const [k, e] of Object.entries(prev)) {
         const shown = e.target === 'all' ? state.org.paused : state.agents.find((a) => a.id === e.target)?.status === 'paused';
-        if (shown && e.phase !== 'failed') {
-          delete next[k];
+        if (shown && e.phase !== 'failed' && e.phase !== 'confirmed') {
+          next[k] = { ...e, phase: 'confirmed' };
           changed = true;
         }
       }

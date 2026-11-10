@@ -1,20 +1,42 @@
 # Orbit
 
-Orbit is a shared spending vault for fleets of AI agents on NEAR. One contract holds USDC. Each agent gets its own NEAR function-call key that can call exactly one method, `pay`. The contract enforces a per-payment limit, a per-agent daily limit, an org-wide daily limit, a merchant allowlist and replay protection, and a separate pause-only guardian key can stop one agent or all of them. A two-screen dashboard reads the vault's real state.
+Orbit is an on-chain spending firewall for autonomous agent businesses. Seller agents can earn through NEAR Agent Market while an Orbit vault controls what they spend on resources to complete jobs. The contract holds one pinned NEP-141 token; the current testnet deployment uses open-mint `otusd`, not Circle USDC. Each agent gets a NEAR function-call key that can call exactly one method, `pay`. The vault enforces per-payment, per-agent daily, and shared daily limits, a merchant allowlist, and replay protection. A separate pause-only guardian key can stop one agent or all of them. The two-screen dashboard reads vault state.
 
-Status: hackathon MVP, running on NEAR testnet with a test token (`otusd`, no value). Mainnet is not deployed.
+Status: hackathon MVP, running on NEAR testnet with a test token (`otusd`, no value). Mainnet is not deployed. The Agent Market seller integration is implemented against its published API but has not yet processed a live assignment.
+
+The [evidence index](evidence/README.md) records what has been observed, what was only tested with fixtures, and the remaining verification gates.
+
+For a short judge walkthrough, see the [90-second demo plan](DEMO.md).
+
+## Hackathon development window
+
+The repository began on 20 October 2026, after the 19 October announcement but before the 1 November event start. Commit `c034e60` (21 October) is the last committed baseline before the November submission work. The working changes accumulated after that commit include the Agent Market seller workflow, paid NEAR account diagnostic, shared-cap concurrency proof, testnet receipt verification, dashboard polish, and this demo guide. Compare `c034e60` with the submission commit to inspect that work. Some testnet evidence was recorded on 30 October; its date is shown in the evidence files. Earlier code and the four scripted demo agents are part of the baseline and are disclosed here rather than presented as newly built after 1 November.
+
+**See the security property in one run:** four independently keyed agents submit 20 concurrent $0.05 payments against one $0.25 organization budget. The sandbox checks that exactly five settle, fifteen are rejected, the merchant receives $0.25 in test-token units, and the vault's final books balance. Run `ORBIT_ONLY=T-14b cargo test -p orbit-sandbox-tests --test sandbox -- --nocapture` after installing the prerequisites below. The demo agents are rule-driven; the quote feed is synthetic. The paid budget brief is computed from actual vault state.
+
+The [recorded T-14b result](evidence/sandbox-shared-cap-t14b.json) reports five paid and fifteen `over_org_daily_limit` rejections. It is a local sandbox result, separate from the live testnet run below.
+
+A [testnet demo proof](evidence/testnet-demo-2026-10-30.json) records 13 distinct paid purchases by the four scripted agents, matching merchant and vault accounting, verified transaction hashes, and 49 passing end-to-end checks. It used the open-mint test token and did **not** exercise Agent Market.
+
+![Live testnet dashboard, showing the test-token fleet budget](evidence/testnet-agents-2026-10-30.png)
+
+The [live Activity screenshot](evidence/testnet-activity-2026-10-30.png) shows paid and rejected outcomes from the same testnet vault.
+
+A separate [paid account diagnostic proof](evidence/testnet-account-audit-2026-10-30.json) records one Orbit 402 purchase of final NEAR account data. The vault's final `payment(id)` is `paid`, and the final transaction contains matching payment events. This verifies the resource the Agent Market seller would buy; no marketplace assignment was involved.
+
+A [fresh testnet receipt-link proof](evidence/testnet-receipt-link-2026-10-30.json) records a 402 purchase after the merchant was changed to require the signed transaction hash to contain the matching final `payment_paid` event.
 
 ## The problem
 
 An agent that pays for APIs needs spending authority. Giving it a wallet key means a prompt-injected or compromised agent can spend everything the key controls. Limits kept in an off-chain service can be raced: many concurrent requests can pass a check before any of them is counted. A fleet also needs one budget across all agents, and a way to stop an agent in seconds without handing that power to the same server that could be compromised.
 
-Orbit puts every limit inside one NEAR contract. Each payment is checked and reserved in a single receipt, so the limits hold under any concurrency. On testnet, 20 simultaneous $0.05 payments from one agent against a $0.25 daily limit give exactly 5 paid and 15 rejected.
+Orbit puts every limit inside one NEAR contract. Each payment is checked and reserved in a single receipt, so the limits hold under any concurrency. On testnet, 20 simultaneous $0.05 payments from one agent against a $0.25 daily limit gave 5 paid and 15 rejected. The checked-in sandbox scenario `T-14b` tests the stronger fleet claim: 20 simultaneous payments from four agents against one $0.25 organization limit give 5 paid and 15 `over_org_daily_limit` rejections, with the merchant's token balance and final vault accounting checked.
 
 ## NEAR features used
 
 - **Function-call access keys, one per agent.** The vault adds each agent's key to its own account with the method list exactly `["pay"]`, receiver the vault and a limited NEAR allowance. The protocol refuses any other method (`MethodNameMismatch`), any deposit (`DepositWithFunctionCall`) and any other receiver. The contract identifies the agent by `env::signer_account_pk()`.
 - **A pause-only guardian key.** A second function-call key with methods exactly `pause_agent,pause_all`, held by the dashboard server. It cannot resume, withdraw, change limits or upgrade.
-- **NEP-141 USDC.** The owner deposits with `ft_transfer_call`; `ft_on_transfer` credits only the owner and only the pinned token, clamped to a float cap, and the excess is refunded by NEP-141. Payments use `ft_transfer` with a settle callback that refunds on failure.
+- **Pinned NEP-141 token.** The testnet demo uses open-mint `otusd`, with no monetary value. A separate mainnet build pins Circle USDC, but has not been deployed. The owner deposits with `ft_transfer_call`; `ft_on_transfer` credits only the owner and only the pinned token, clamped to a float cap, and the excess is refunded by NEP-141. Payments use `ft_transfer` with a settle callback that refunds on failure.
 - **NEP-297 events** (`orbit-vault` 1.0.0) for every reservation, payment, rejection and admin action.
 - Re-broadcasting identical signed bytes returns the original result and never executes twice (observed on testnet and in the sandbox); a stored `payment_id` stops a second payment for one invoice.
 
@@ -44,7 +66,7 @@ OutLayer (a hackathon partner) offers TEE-held, multi-chain agent wallets with a
 | `contracts/sandbox` | Sandbox integration harness (near-workspaces, real receipts) |
 | `packages/orbit-agent` | Agent SDK: key generation, `pay()`, `orbitFetch()` for HTTP 402 |
 | `packages/vault-types` | Shared view and API types |
-| `services/merchant` | Demo paid data API (synthetic data) that verifies payments on chain |
+| `services/merchant` | Orbit-paid account diagnostic from live final NEAR RPC state; synthetic quote API; paid budget brief from vault state; verifies payments on chain |
 | `services/api`, `apps/dashboard` | Read API, history, guardian pause, two-screen dashboard |
 | `tools/orbit-cli` | Owner commands |
 | `demo/agents`, `demo/attack` | Demo fleet and attack script |
@@ -54,10 +76,12 @@ OutLayer (a hackathon partner) offers TEE-held, multi-chain agent wallets with a
 
 Prerequisites: Rust via rustup (the repo pins 1.86.0 with `wasm32-unknown-unknown`), `cargo install cargo-near` (0.22), [near-cli-rs](https://github.com/near/near-cli-rs) (`near`, 0.30), Node 22, pnpm 9. Everything below uses testnet only and a test token.
 
+For a clean demo vault, run `pnpm install && pnpm demo:setup`. The setup creates and funds fresh testnet accounts, deploys the current committed contract, and registers the four demo agents plus a separate attack agent. It writes account IDs to the ignored `demo/.env.demo` and key paths to a file outside the repo. To use that vault in a shell, run `set -a; . demo/.env.demo; . "$DEMO_ENV_FILE"; set +a`. Run `DEMO_MINUTES=4 node harness/ui/check-demo.mjs` for the full agent, merchant, API and dashboard proof. If the contract changes, set a new `DEMO_TAG` when running setup so the new vault uses that build; setup refuses to reuse an existing vault whose on-chain code hash differs.
+
 ### 1. Install and build
 
 ```bash
-git clone <repo> orbit && cd orbit
+git clone https://github.com/bebe0307mz/orbit.git && cd orbit
 pnpm install
 scripts/build-contracts.sh
 ```
@@ -67,8 +91,9 @@ See: `Binary: .../target/near/mock_ft/mock_ft.wasm` and `Binary: .../target/near
 ### 2. Run the tests
 
 ```bash
-cargo test -p orbit-vault --lib            # see: test result: ok. 22 passed
-cargo test -p orbit-sandbox-tests --test sandbox -- --nocapture   # see: VERDICT: PASS 22, FAIL 0, SKIP 1
+cargo test -p orbit-vault --lib            # see: test result: ok. 25 passed
+cargo test -p orbit-sandbox-tests --test sandbox -- --nocapture   # includes T-14b; verify the final verdict on your run
+ORBIT_ONLY=T-14b cargo test -p orbit-sandbox-tests --test sandbox -- --nocapture # exact four-agent shared-cap proof
 pnpm test                                  # TypeScript suites (SDK, merchant, CLI, API, dashboard)
 ```
 
@@ -131,13 +156,25 @@ pnpm merchant
 
 See: `{"msg":"merchant_listening","port":8402,"demo":true}`. `curl -i localhost:8402/v1/quote?symbol=NEAR` returns `HTTP/1.1 402` with a JSON invoice (`"scheme":"orbit-near"`, `payment_id`, `amount`, `deadline_ms`).
 
+If the merchant is served at a different public address, set `MERCHANT_PUBLIC_ORIGIN` to the exact scheme, host and port the agents request. The invoice and signed proof use that origin.
+
 Terminal 2:
 
 ```bash
 MERCHANT_URL=http://127.0.0.1:8402 pnpm demo:agents run --minutes 2
 ```
 
-The four agents request quotes, pay the 402 invoices through the vault and print their outcomes; each paid line carries a `https://testnet.nearblocks.io/txns/<hash>` link. The merchant serves a quote only after `payment(id)` at final shows `paid` for that merchant and amount, the invoice is unused, and the proof is signed by the paying agent's key.
+The research scout first pays for `/v1/budget-brief`, which computes its next-purchase capacity from the vault's actual organization, agent, and available balances; it proceeds with research purchases only if the brief says `continue`. The other agents request synthetic demo quotes. Each paid line carries a `https://testnet.nearblocks.io/txns/<hash>` link. An agent pays only when the invoice names the exact URL it requested and the configured merchant for that origin. The merchant serves a result only after `payment(id)` at final shows `paid` for that merchant and amount and the proof binds the paying agent's key to the merchant, origin and resource. A retry with the same proof returns the saved result if the first HTTP response was lost. The quote endpoint remains **synthetic** and is labeled as such; the budget brief is computed from on-chain state but is not an AI model.
+
+### Agent Market seller workflow
+
+Orbit's seller agent polls the official [NEAR Agent Market worker API](https://docs.market.near.ai/list-your-agent) for its own assignments. The buyer pays the marketplace through its normal escrow; Orbit governs the seller's **outbound** spending. The listing should offer a NEAR account diagnostic and ask the buyer to include exactly one line such as `NEAR account: example.testnet` in the job description. The seller declares the assignment started, purchases `/v1/account-audit?account=...` from the Orbit merchant, then submits a factual account and access-key inventory as `deliverableMarkdown`. The merchant obtains its data from final NEAR RPC reads; a read-only live call against `near.testnet` succeeded. This endpoint is operator-run and its underlying RPC data is public, so a third-party paid data provider remains an adoption milestone.
+
+For a live run, create a self-hosted seller listing in Agent Market and generate an `aat_` agent token. Register a separate Orbit agent key on the testnet vault, allowlist and fund the merchant, and run `pnpm merchant`. The merchant binds to `127.0.0.1` by default; set `MERCHANT_HOST` and `MERCHANT_PUBLIC_ORIGIN` explicitly if deploying it elsewhere. Set `MARKET_AGENT_KEY_FILE` in your private shell environment, then run `pnpm demo:agents market-check`. This read-only command checks Agent Market authentication, the merchant, token storage registration, the pay-only key and gas allowance, and vault budget. On macOS it reads the seller token from the `orbit-agent-market-token` Keychain item (account `orbit`); `MARKET_AGENT_TOKEN` is an explicit fallback or override. Keep the token out of the repository and terminal history.
+
+After the listing is approved for publication and a buyer assignment exists, run `pnpm demo:agents market`. It repeats preflight, then processes current `in_progress` assignments once; run it again to poll later. Keep `MARKET_STATE_FILE` outside the repository and use one worker with that state file. It records the invoice before payment and the hash after payment; on restart it retries the **same proof** if both are known, retries safely if no invoice was ever obtained, and otherwise holds for manual reconciliation. An exclusive lock prevents concurrent workers on one host from using the same state file, and merchant requests time out after 15 seconds. It never silently buys a new invoice after an ambiguous payment. Never delete the state file or a leftover lock during an unresolved payment. The marketplace response shape and local purchase lifecycle have fixture tests, but **no live marketplace assignment, marketplace payout, or end-to-end seller purchase is verified yet**.
+
+The merchant's `orbit-near` HTTP 402 scheme is x402-style, not x402 v2 `exact` compatible. Orbit does not pay Agent Market's buyer-side x402 invoices. Its vault is the payer for seller expenses, and the marketplace buyer pays through marketplace escrow.
 
 ### 7. Attack
 
@@ -177,9 +214,15 @@ See: every agent with limits and spending, and `OK` on C1 (deposited equals avai
 
 `scripts/testnet-proof.sh` runs the same story non-interactively (deploy with near-cli, payments, rejections, guardian pause, accounting and key checks) and writes `harness/out/testnet-<utc>/summary.json`. `pnpm harness` builds a static HTML report from all test layers and proofs.
 
+## Prepared mainnet build
+
+The mainnet variant built from contract commit `183b59c` has SHA-256 `46d1350057c950f40672264f997d96cbc80716cd429f27e1c4ea691a6f75bc0c` and NEAR code hash `5mSZdcMm8LSnnh3FEMpPkXbL4H8scveqYAsCbbRno8RZ`. The sandbox mainnet guard passed for this build. It has not been deployed; verify both hashes again before any mainnet transaction. The remaining account, funding and signature steps are in `contracts/vault/NOTES.md`.
+
 ## Security model in brief
 
 - The owner key (founder machine only) can do everything, including `upgrade`; the float cap keeps the vault small (20 USDC on mainnet).
 - A stolen agent key can spend at most that agent's remaining limits per UTC day, inside the org limit, only to allowlisted merchants, until it is paused or revoked. Its NEAR allowance bounds the gas it can burn.
+- The vault rejects payments below $0.01 and caps each agent at 200 accepted payments per UTC day by default, limiting storage growth from a compromised key.
+- A paused agent's key can still pay transaction fees for rejected attempts. `orbit-cli status` warns when recent outcomes show attempts by a paused agent; revoke the key if they continue.
 - A stolen guardian key can only pause.
 - Known limits: a 24 hour window that spans UTC midnight can see up to two days of one agent's limit; a settle callback that fails leaves the payment reserved until an `upgrade` repairs it. Details: `contracts/vault/NOTES.md`.

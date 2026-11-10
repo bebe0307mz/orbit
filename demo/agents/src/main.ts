@@ -9,11 +9,13 @@ import { existsSync, mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { keygen, loadKey, NearRpc } from '@orbit/agent';
+import { keygen, loadKey, NearRpc, OrbitAgent, orbitFetch } from '@orbit/agent';
 import { DEFAULT_RPC, type VaultState } from '@orbit/vault-types';
 import { JOBS } from './policy.ts';
 import { runAgents } from './run.ts';
 import { proveRun } from './proof.ts';
+import { runMarketSeller } from './market-seller.ts';
+import { runMarketPreflight } from './market-preflight.ts';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const env = (k: string, d?: string) => {
@@ -95,9 +97,70 @@ async function run() {
   }
 }
 
+async function audit() {
+  if (network !== 'testnet') throw new Error('The demo audit command is testnet only');
+  const account = opt('account');
+  if (!account || !/^(?=.{2,64}$)[a-z0-9]+(?:[-_.][a-z0-9]+)*$/.test(account)) {
+    throw new Error('Provide a valid testnet account with --account, for example near.testnet');
+  }
+  const merchantUrl = env('MERCHANT_URL', 'http://127.0.0.1:8402');
+  const merchantAccount = env('MERCHANT_ACCOUNT_ID');
+  const url = new URL('/v1/account-audit', merchantUrl);
+  url.searchParams.set('account', account);
+  const agent = new OrbitAgent({ vault, rpc: rpcUrls, key: keyFile('research-scout'), network: 'near:testnet', reportUrl: process.env.ORBIT_API_URL || null });
+  const result = await orbitFetch(agent, url, {}, {
+    maxAmount: '50000', asset: env('TOKEN_ACCOUNT_ID'), merchants: [merchantAccount],
+    originMerchants: { [url.origin]: merchantAccount },
+  });
+  const invoice = result.invoice;
+  const payment = result.payment;
+  console.log(`resource: ${url.href}`);
+  if (invoice) console.log(`402 invoice: ${invoice.payment_id} · ${invoice.amount} test-token base units`);
+  if (payment) {
+    console.log(`vault payment: ${payment.status}${payment.reason ? ` (${payment.reason})` : ''}`);
+    if (payment.tx_hash) console.log(`transaction: https://testnet.nearblocks.io/txns/${payment.tx_hash}`);
+  }
+  if (payment?.status !== 'paid' || !result.response.ok) {
+    console.error(`diagnostic unavailable: ${result.error ?? `HTTP ${result.response.status}`}`);
+    process.exitCode = 1;
+    return;
+  }
+  const data = await result.response.json() as { account?: string; network_data?: string; account_block?: number; full_access_keys?: number; function_call_keys?: unknown[]; payment_id?: string };
+  if (data.account !== account || data.network_data !== 'live_final_rpc' || data.payment_id !== invoice?.payment_id) {
+    throw new Error('Paid diagnostic response did not match the requested account and invoice');
+  }
+  console.log(`HTTP ${result.response.status}: ${data.account} at final block ${data.account_block}; ${data.full_access_keys} full-access keys, ${data.function_call_keys?.length} function-call keys`);
+}
+
 if (cmd === 'keys') await keys();
 else if (cmd === 'run') await run();
+else if (cmd === 'audit') await audit();
+else if (cmd === 'market' || cmd === 'market-check') {
+  let marketToken = process.env.MARKET_AGENT_TOKEN;
+  if (!marketToken && process.platform === 'darwin') {
+    try {
+      marketToken = execFileSync('security', ['find-generic-password', '-a', 'orbit', '-s', 'orbit-agent-market-token', '-w'],
+        { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    } catch {
+      throw new Error('Agent Market token is unavailable in Keychain; set MARKET_AGENT_TOKEN privately or add the orbit-agent-market-token item');
+    }
+  }
+  const cfg = {
+    marketUrl: env('MARKET_URL', 'https://market.near.ai'), token: marketToken ?? env('MARKET_AGENT_TOKEN'),
+    merchantUrl: env('MERCHANT_URL', 'http://127.0.0.1:8402'), merchantAccount: env('MERCHANT_ACCOUNT_ID'),
+    asset: env('TOKEN_ACCOUNT_ID'), maxAmount: env('MARKET_MAX_AMOUNT', '100000'),
+    keyFile: env('MARKET_AGENT_KEY_FILE'), vault, network: network === 'mainnet' ? 'near:mainnet' : 'near:testnet',
+    rpcUrls, stateFile: env('MARKET_STATE_FILE', join(homedir(), '.orbit', 'market-seller-state.json')),
+  } as const;
+  const preflight = await runMarketPreflight(cfg);
+  for (const check of preflight.checks) console.log(`${check.ok ? 'PASS' : 'BLOCK'} ${check.name}: ${check.detail}`);
+  if (!preflight.ready) process.exitCode = 1;
+  else if (cmd === 'market') {
+    const result = await runMarketSeller(cfg);
+    console.log(`market run: ${result.processed} submitted, ${result.held} held for reconciliation`);
+  }
+}
 else {
-  console.error('usage: pnpm demo:agents keys [--register] [--org-limit 5.00] | run [--minutes N] [--proof]');
+  console.error('usage: pnpm demo:agents keys [--register] [--org-limit 5.00] | run [--minutes N] [--proof] | audit --account near.testnet | market-check | market');
   process.exit(2);
 }

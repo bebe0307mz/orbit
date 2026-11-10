@@ -22,7 +22,9 @@ export interface Rows {
   /** ring only: total matching rows */
   total: number | null;
   loading: boolean;
+  error: string | null;
   loadOlder(): void;
+  retry(): void;
   /** merchant accounts seen in history (for the merchant filter) */
   seenMerchants: string[];
 }
@@ -39,6 +41,7 @@ export function useActivityRows(f: Filters): Rows {
   const { source, state, outcomes } = useStore();
   const cursor = source.history === 'cursor' && !!source.getActivity;
   const [pages, setPages] = useState(1);
+  const [refresh, setRefresh] = useState(0);
   const key = `${f.status}|${f.agent}|${f.merchant}`;
   useEffect(() => setPages(1), [key]);
 
@@ -52,7 +55,7 @@ export function useActivityRows(f: Filters): Rows {
   }, [cursor, state, outcomes, f.status, f.agent, f.merchant]);
 
   // ---- cursor ----
-  const [items, setItems] = useState<{ key: string; pend: PendingView[]; outs: OutcomeItem[]; next: number | null; loading: boolean }>({ key: '', pend: [], outs: [], next: null, loading: true });
+  const [items, setItems] = useState<{ key: string; pend: PendingView[]; outs: OutcomeItem[]; next: number | null; loading: boolean; error: string | null }>({ key: '', pend: [], outs: [], next: null, loading: true, error: null });
   const seq = useRef(0);
   const q = useCallback(
     (beforeSeq?: number): ActivityQuery => ({
@@ -69,23 +72,24 @@ export function useActivityRows(f: Filters): Rows {
   useEffect(() => {
     if (!cursor || !state) return;
     const my = ++seq.current;
+    setItems((prev) => prev.key === key ? { ...prev, loading: true, error: null } : { key, pend: [], outs: [], next: null, loading: true, error: null });
     source.getActivity!(q()).then(
       (page) => {
         if (my !== seq.current) return;
         setItems((prev) => {
           const first = page.items.filter((i) => i.status !== 'pending').map(toOutcome);
           const pend = page.items.filter((i) => i.status === 'pending').map(toPending);
-          if (prev.key !== key) return { key, pend, outs: first, next: page.next_before_seq, loading: false };
+          if (prev.key !== key) return { key, pend, outs: first, next: page.next_before_seq, loading: false, error: null };
           // merge: new rows on top, older loaded pages kept
           const have = new Set(first.map((o) => o.seq));
           const outs = [...first, ...prev.outs.filter((o) => !have.has(o.seq) && (first.length === 0 || o.seq < first[first.length - 1]!.seq))];
           const olderLoaded = prev.outs.length > first.length;
-          return { key, pend, outs, next: olderLoaded ? prev.next : page.next_before_seq, loading: false };
+          return { key, pend, outs, next: olderLoaded ? prev.next : page.next_before_seq, loading: false, error: null };
         });
       },
-      () => my === seq.current && setItems((p) => ({ ...p, loading: false })),
+      () => my === seq.current && setItems((p) => ({ ...p, loading: false, error: 'Payment history did not load' })),
     );
-  }, [cursor, key, pulse, source, q, !!state]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [cursor, key, pulse, source, q, refresh, !!state]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadOlder = useCallback(() => {
     if (!cursor) return setPages((n) => n + 1);
@@ -95,11 +99,15 @@ export function useActivityRows(f: Filters): Rows {
     source.getActivity!(q(items.next)).then(
       (page) => {
         if (my !== seq.current) return;
-        setItems((p) => ({ ...p, outs: [...p.outs, ...page.items.filter((i) => i.status !== 'pending').map(toOutcome)], next: page.next_before_seq, loading: false }));
+        setItems((p) => ({ ...p, outs: [...p.outs, ...page.items.filter((i) => i.status !== 'pending').map(toOutcome)], next: page.next_before_seq, loading: false, error: null }));
       },
-      () => setItems((p) => ({ ...p, loading: false })),
+      () => my === seq.current && setItems((p) => ({ ...p, loading: false, error: 'Could not load older payments' })),
     );
   }, [cursor, items.next, source, q]);
+  const retry = useCallback(() => {
+    if (items.error === 'Could not load older payments') loadOlder();
+    else setRefresh((n) => n + 1);
+  }, [items.error, loadOlder]);
 
   const seenMerchants = useMemo(() => {
     const list = cursor ? items.outs : outcomes;
@@ -109,7 +117,7 @@ export function useActivityRows(f: Filters): Rows {
   if (!cursor) {
     const r = ring ?? { pend: [], outs: [] };
     const shown = r.outs.slice(0, pages * PAGE);
-    return { pend: r.pend, outs: r.outs, shown, hasMore: r.outs.length > shown.length, total: r.outs.length, loading: false, loadOlder, seenMerchants };
+    return { pend: r.pend, outs: r.outs, shown, hasMore: r.outs.length > shown.length, total: r.outs.length, loading: false, error: null, loadOlder, retry, seenMerchants };
   }
   const fresh = items.key === key;
   return {
@@ -119,7 +127,9 @@ export function useActivityRows(f: Filters): Rows {
     hasMore: fresh && items.next != null,
     total: null,
     loading: !fresh || items.loading,
+    error: fresh ? items.error : null,
     loadOlder,
+    retry,
     seenMerchants,
   };
 }

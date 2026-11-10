@@ -6,7 +6,7 @@ import {
 import { Banners, useStale } from '../components/Shell';
 import { Cmd, Dot, Meter, isTypingTarget, maxDecimals, padTo } from '../components/common';
 import { useNow, useStore, type OpEntry } from '../lib/store';
-import { replaceRoute, type Route } from '../lib/route';
+import { hrefFor, replaceRoute, type Route } from '../lib/route';
 import { AgentPanel } from './AgentPanel';
 import { PauseDialog } from './PauseDialog';
 import { AddAgentSheet } from './AddAgentSheet';
@@ -72,13 +72,11 @@ function Figures({ s }: { s: DashboardState }) {
         <div className="v num" style={room(s.org.daily_limit)} data-check="org.remaining">{s.org.paused ? 'Org paused' : fmtUsd(orgRemainingShown(s.org, v.available))}</div>
         <div className="s">{vaultBindsOrg(s.org, v.available) ? 'limited by vault balance' : 'Resets 00:00 UTC'}</div>
       </div>
-      {s.pending_count > 0 ? (
-        <div className="fig">
-          <div className="l">In flight</div>
-          <div className="v num" style={room(s.org.daily_limit)} data-check="inflight">{fmtUsd(s.org.reserved)}</div>
-          <div className="s"><span data-check="inflight.n">{s.pending_count}</span> payment{s.pending_count === 1 ? '' : 's'}</div>
-        </div>
-      ) : null}
+      <div className="fig">
+        <div className="l">In flight</div>
+        <div className="v num" style={room(s.org.daily_limit)} data-check="inflight">{fmtUsd(s.org.reserved)}</div>
+        <div className="s"><span data-check="inflight.n">{s.pending_count}</span> payment{s.pending_count === 1 ? '' : 's'}</div>
+      </div>
     </div>
   );
 }
@@ -244,9 +242,11 @@ export function AgentsScreen({ route }: { route: Route }) {
 
   const head = (count: number | null) => (
     <div className="page-head">
-      <h1 className="t-title">
-        Agents{count != null ? <span className="count">{count}</span> : null}
-      </h1>
+      <div className="page-heading">
+        <span className="page-kicker">Fleet overview</span>
+        <h1 className="t-title">Agent spending{count != null ? <span className="count">{count} agents</span> : null}</h1>
+        <p className="page-description">An on-chain spending firewall for agents buying resources while they complete jobs.</p>
+      </div>
       <div className="actions">
         {operator && s && s.agents.length > 0 && !s.org.paused ? (
           <button className="btn secondary sm" type="button" id="pauseAll" disabled={busy(ops.all)} onClick={() => openPause('all')}>
@@ -300,6 +300,15 @@ export function AgentsScreen({ route }: { route: Route }) {
         {head(s.agents.length)}
         <div className={stale ? 'dim' : ''}>
           <Figures s={s} />
+          <p className="budget-explain">
+            <strong>One shared daily budget protects {s.agents.filter((a) => a.status !== 'revoked').length} agent{s.agents.filter((a) => a.status !== 'revoked').length === 1 ? '' : 's'}.</strong>
+            {' '}The vault reserves each payment on chain before transferring tokens, so simultaneous requests cannot spend past the organization limit.
+          </p>
+          <div className="operational-strip" aria-label="Fleet activity summary">
+            <span><strong>{s.agents.filter((a) => a.status === 'active').length}</strong> active agents</span>
+            <a href={hrefFor('activity', { status: 'pending' })}><strong>{s.pending_count}</strong> in flight <span aria-hidden="true">↗</span></a>
+            <a href={hrefFor('activity', { status: 'rejected' })}><strong>{s.counts.rejected}</strong> rejected payments <span aria-hidden="true">↗</span></a>
+          </div>
           <Banners screen="agents">
             {s.org.paused ? (
               <div className="banner" data-testid="banner-orgpaused">

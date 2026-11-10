@@ -1,0 +1,298 @@
+{
+  "kind": "orbit_testnet_demo_evidence",
+  "observed_at_utc": "2026-10-30T01:57:36Z",
+  "network": "near:testnet",
+  "token": "orbit-demo-codex-22-token.testnet",
+  "token_value": "open-mint test token; no monetary value",
+  "agent_behavior": "four rule-driven demo agents",
+  "resource_behavior": "synthetic quotes plus a paid vault-state budget brief",
+  "marketplace_integration": "not exercised in this run",
+  "deployed_contract_commit": "183b59c90f3ec1df1f7a9bfea166c3daaf2fd08f",
+  "summary": {
+    "title": "Autonomous demo agents on testnet, with services/api and the dashboard (demo/agents)",
+    "vault": "orbit-demo-codex-22-vault.testnet",
+    "block_height": 275384111,
+    "counts": {
+      "paid": 49,
+      "failed": 0,
+      "rejected": 18,
+      "next_seq": 67
+    },
+    "run": {
+      "started": "2026-10-30T01:55:35.197Z",
+      "minutes": 2,
+      "purchases": 13,
+      "paid": 13,
+      "paid_total": "130000",
+      "merchant_delta": "130000"
+    },
+    "checks": [
+      {
+        "check": "the four agents paid the merchant at least once each",
+        "ok": true,
+        "detail": "research-scout 5, price-watcher 3, summary-writer 3, invoice-bot 2"
+      },
+      {
+        "check": "every paid purchase is a paid ring outcome with the same id, seq and amount",
+        "ok": true,
+        "detail": "13 matched"
+      },
+      {
+        "check": "merchant balance delta equals the paid outcomes to the merchant",
+        "ok": true,
+        "detail": "130000 vs 130000"
+      },
+      {
+        "check": "paid_total delta equals the paid outcomes in the run",
+        "ok": true,
+        "detail": "130000"
+      },
+      {
+        "check": "merchant balance delta equals the sum of the agents' paid amounts",
+        "ok": true,
+        "detail": "agents 130000, merchant delta 130000"
+      },
+      {
+        "check": "I7 conservation after the run",
+        "ok": true,
+        "detail": "20000000 = 19310000+0+690000+0"
+      },
+      {
+        "check": "I9 counters after the run",
+        "ok": true,
+        "detail": "{\"paid\":49,\"failed\":0,\"rejected\":18,\"next_seq\":67}"
+      },
+      {
+        "check": "no purchase above the agent per-payment limit",
+        "ok": true,
+        "detail": "0"
+      },
+      {
+        "check": "no purchase left with an unknown outcome",
+        "ok": true,
+        "detail": "0"
+      },
+      {
+        "check": "nothing pending after the run",
+        "ok": true,
+        "detail": "pending 0"
+      },
+      {
+        "check": "C2 token backing after the run (strict: nothing pending)",
+        "ok": true,
+        "detail": "vault holds 19310000, ledger requires 19310000"
+      },
+      {
+        "check": "services/api synced every outcome of the run",
+        "ok": true,
+        "detail": "last_seq 66, next_seq 67"
+      },
+      {
+        "check": "services/api token backing (C2) held at every health sample during the run, in-flight form while payments were pending",
+        "ok": true,
+        "detail": "60 samples, 12 in flight, 0 short; final: holds 19310000, requires 19310000"
+      },
+      {
+        "check": "services/api RPC fallback: injected INTERNAL_ERROR reads answered by the fallback URL",
+        "ok": true,
+        "detail": "52 injected of 158 reads, 52 fallback answers, rpc_ok true"
+      },
+      {
+        "check": "every paid purchase is listed by /v1/activity",
+        "ok": true,
+        "detail": "13 of 13"
+      },
+      {
+        "check": "tx hashes reported and verified (POST /v1/tx-reports)",
+        "ok": true,
+        "detail": "13 of 13 rows carry a verified tx hash"
+      },
+      {
+        "check": "dashboard updates live without reload (Activity, Agents, panel)",
+        "ok": true,
+        "detail": "248 samples, rows 25 -> 38, reloads 0"
+      },
+      {
+        "check": "new rows appear at the top of Activity",
+        "ok": true,
+        "detail": "20 different first rows"
+      },
+      {
+        "check": "scrolled Activity keeps its place while rows arrive above (anchor drift <= 2 px)",
+        "ok": true,
+        "detail": "drift 0.0 px over 248 checks, scrollY 200 -> 728"
+      },
+      {
+        "check": "rows that arrive live are highlighted briefly and still lay out as table rows",
+        "ok": true,
+        "detail": "89 highlighted row samples, 0 rows not display:table-row"
+      },
+      {
+        "check": "price-watcher panel recent payments update live",
+        "ok": true,
+        "detail": "4 different newest rows"
+      },
+      {
+        "check": "header figures keep their place while values change (no width shift)",
+        "ok": true,
+        "detail": "left edges 24,255,486"
+      },
+      {
+        "check": "Agents amount columns line up on the decimal point (mixed 2 and 3 decimals)",
+        "ok": true,
+        "detail": "td.c-spent 0.0px, td.c-daily 0.0px, td.c-per 0.0px, td.c-rem .num 0.0px"
+      },
+      {
+        "check": "In flight figure shows while payments are pending",
+        "ok": true,
+        "detail": "248 of 248 samples"
+      },
+      {
+        "check": "Activity fills with the agents' paid rows",
+        "ok": true,
+        "detail": "19 demo rows on the first page, 13 paid in the run"
+      },
+      {
+        "check": "dashboard figures equal /v1/state after the run (both themes)",
+        "ok": true,
+        "detail": "2 checks"
+      }
+    ]
+  },
+  "payments": [
+    {
+      "agent": "research-scout",
+      "symbol": "BUDGET",
+      "payment_id": "258d6552128f8d20a03ffa4e6b32755b687863c32bb82a5fd8f1c291f969bdab",
+      "amount": "10000",
+      "status": "paid",
+      "reason": null,
+      "seq": 54,
+      "tx_hash": "2LyLtRj9fBVYVUNcAoR2Py9R6VZBJ4T2wEMnCa213QpQ"
+    },
+    {
+      "agent": "price-watcher",
+      "symbol": "NEAR",
+      "payment_id": "d29fc60379d37e24aac5a4d1b5e08d0acedc578912237ab66d4be82f9234cb6b",
+      "amount": "10000",
+      "status": "paid",
+      "reason": null,
+      "seq": 55,
+      "tx_hash": "DMoneH1cUKTVGEaySLr6Xpb7z8UZrf33x8WwwZwf6rgP"
+    },
+    {
+      "agent": "summary-writer",
+      "symbol": "NEAR",
+      "payment_id": "d5385658998aec52262a15efc48f26a677a5abb07727ce5b186d0fa9fb98f433",
+      "amount": "10000",
+      "status": "paid",
+      "reason": null,
+      "seq": 56,
+      "tx_hash": "8h7YqX5WesxaiUm2gFADsWEahncM2vvDaAxTBrGU9Ddk"
+    },
+    {
+      "agent": "research-scout",
+      "symbol": "NEAR",
+      "payment_id": "2559192f771120a5549a293b30a456ee920caed9aeb7858f91867a38e00bfb1f",
+      "amount": "10000",
+      "status": "paid",
+      "reason": null,
+      "seq": 57,
+      "tx_hash": "HMPh9DC34JMzBMhfJgVWQbMufERZywHM1nr96soLPsQJ"
+    },
+    {
+      "agent": "invoice-bot",
+      "symbol": "SGD",
+      "payment_id": "9fdb8fe536dac4b91307c9f44aa2bd7daf30aff5e903667ecd3ab3f133802d34",
+      "amount": "10000",
+      "status": "paid",
+      "reason": null,
+      "seq": 58,
+      "tx_hash": "A868ApJmLGTyPQZW2RsQ6bQMKApawtFntqMiDk6nLXad"
+    },
+    {
+      "agent": "summary-writer",
+      "symbol": "AURORA",
+      "payment_id": "1d6f4bfd7cab0c8d5dc88ec5cc7c7afe5d611afae43f09d8bc8df9c5a3869023",
+      "amount": "10000",
+      "status": "paid",
+      "reason": null,
+      "seq": 59,
+      "tx_hash": "7pLU1PzEEYT57GnhUgaXHd1ByS8W67szHqgN2UySoy3q"
+    },
+    {
+      "agent": "research-scout",
+      "symbol": "ETH",
+      "payment_id": "60224f216b42d59eb1bf6c690ca9e2c7b07cf3b52463097b3e8c2a2e3e76656f",
+      "amount": "10000",
+      "status": "paid",
+      "reason": null,
+      "seq": 60,
+      "tx_hash": "BrxpK4P8t9XY3cPL3Z8aKiLrZi5Dap8Js27f8jRUz2eX"
+    },
+    {
+      "agent": "summary-writer",
+      "symbol": "USDC",
+      "payment_id": "16e4f18de386eba83c54a41baa667a6e0ce881f8610c717340996665528858c9",
+      "amount": "10000",
+      "status": "paid",
+      "reason": null,
+      "seq": 61,
+      "tx_hash": "5qdy5qWPaxsExrMFVHKe6Eu71T2EkyhuAPwPAZNZ5JVM"
+    },
+    {
+      "agent": "research-scout",
+      "symbol": "BTC",
+      "payment_id": "66714f061fa6dcaee2c66e4df4202d4abcc90678f23060c61b3863bfabb82280",
+      "amount": "10000",
+      "status": "paid",
+      "reason": null,
+      "seq": 62,
+      "tx_hash": "A5woitFxzVCPFRLEJBGZTwmVYhB6xQzwA3Ns7PvDhj1F"
+    },
+    {
+      "agent": "research-scout",
+      "symbol": "SOL",
+      "payment_id": "42586ea680de43753b5c9f664def5daf9603a63a10f854615335e87a3208289e",
+      "amount": "10000",
+      "status": "paid",
+      "reason": null,
+      "seq": 63,
+      "tx_hash": "urzy9BiVYAvkW7u9juomrRcmLKFgdXXdBt5fDnB3cmC"
+    },
+    {
+      "agent": "price-watcher",
+      "symbol": "NEAR",
+      "payment_id": "e5121dce2c4dd1bb7cf639db6c54c6acd896ba6705d49567c5496db65c888614",
+      "amount": "10000",
+      "status": "paid",
+      "reason": null,
+      "seq": 64,
+      "tx_hash": "uS7DQKzNzYPvVvg8VkqireVoFKpgMUAEksF1Pgjq2v9"
+    },
+    {
+      "agent": "invoice-bot",
+      "symbol": "EUR",
+      "payment_id": "0f732d825584072992053c878a8e04d06c95dea9313566ad225a7f7174869d3b",
+      "amount": "10000",
+      "status": "paid",
+      "reason": null,
+      "seq": 65,
+      "tx_hash": "7otS716hGj6CvoQK7A77M9yYmkGAYSH9tMdY1KvtCEd6"
+    },
+    {
+      "agent": "price-watcher",
+      "symbol": "NEAR",
+      "payment_id": "f8d4485d0c93fdc1bf566271d842f4ac2d5515906e46d54066cbb8e4acf4c99d",
+      "amount": "10000",
+      "status": "paid",
+      "reason": null,
+      "seq": 66,
+      "tx_hash": "ALzTyBhaa8zKNRy8iLrbn3UsYu7rSQm6AY2F6RYs4L7U"
+    }
+  ],
+  "harness_result": {
+    "passed": 49,
+    "failed": 0
+  }
+}

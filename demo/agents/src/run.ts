@@ -95,7 +95,42 @@ export async function runAgents(cfg: RunConfig, jobs: Job[], signal: AbortSignal
     }
     log(job.name, `start · agent ${me.id} · ${job.role} · max ${usd(job.maxAmount)} per purchase · limits ${usd(me.per_payment_limit)} per payment, ${usd(me.daily_limit)} a day`);
     await sleep(offset);
+    let budgetChecked = job.name !== 'research-scout';
     while (live()) {
+      if (!budgetChecked) {
+        const s = await reader.get();
+        const mine = s?.agents.find((a) => a.id === me.id);
+        const held = gate(g, 'BUDGET', Date.now(), mine ? BigInt(mine.remaining_today) : null, price);
+        if (held) {
+          if (held.kind === 'stop') { log(job.name, `stop: ${held.why}`); break; }
+          log(job.name, held.why);
+          await sleep(held.ms);
+          continue;
+        }
+        log(job.name, 'buy budget brief: check shared treasury before research purchases');
+        const url = new URL('/v1/budget-brief', cfg.merchantUrl);
+        const r = await orbitFetch(agent, url, {}, { maxAmount: job.maxAmount, asset: cfg.token, merchants: [cfg.merchantAccount], originMerchants: { [new URL(cfg.merchantUrl).origin]: cfg.merchantAccount } });
+        const p = r.payment;
+        if (p) {
+          purchases.push({ agent: job.name, symbol: 'BUDGET', payment_id: p.payment_id, amount: r.invoice?.amount ?? null, status: p.status, reason: p.reason, seq: p.seq, tx_hash: p.tx_hash, at: Date.now() });
+          const tx = p.tx_hash ? ` · ${cfg.explorer}/txns/${p.tx_hash}` : '';
+          log(job.name, `budget brief ${p.status}${p.reason ? ' ' + p.reason : ''}${tx}`, { status: p.status, payment_id: p.payment_id, tx_hash: p.tx_hash });
+        }
+        if (p?.status === 'paid' && r.response.ok) {
+          const brief = await r.response.json() as { decision: 'continue' | 'hold'; safe_next_purchases: string; reason: string; vault_block: number };
+          log(job.name, `budget says ${brief.decision}: ${brief.safe_next_purchases} further purchases at this price · ${brief.reason} · vault block ${brief.vault_block}`);
+          budgetChecked = true;
+          if (brief.decision === 'hold') break;
+        } else {
+          const outcome: Outcome = p?.status === 'rejected' ? { kind: 'rejected', reason: p.reason ?? 'unknown' }
+            : p?.status === 'failed' ? { kind: 'failed', reason: p.reason }
+            : p?.status === 'not_executed' ? { kind: 'not_executed', reason: p.reason }
+            : p?.status === 'unknown' ? { kind: 'unknown' }
+            : { kind: 'merchant_refused', why: r.error ?? `HTTP ${r.response.status}` };
+          log(job.name, react(g, outcome, 'BUDGET', Date.now()));
+        }
+        continue;
+      }
       const note = job.tick?.(Date.now(), m, rand);
       if (note) log(job.name, note);
       const d = job.next(Date.now(), m);
@@ -118,7 +153,7 @@ export async function runAgents(cfg: RunConfig, jobs: Job[], signal: AbortSignal
       }
       log(job.name, `buy ${d.symbol}: ${d.why}`);
       const url = new URL(`/v1/quote?symbol=${d.symbol}`, cfg.merchantUrl);
-      const r = await orbitFetch(agent, url, {}, { maxAmount: job.maxAmount, asset: cfg.token, merchants: [cfg.merchantAccount] });
+      const r = await orbitFetch(agent, url, {}, { maxAmount: job.maxAmount, asset: cfg.token, merchants: [cfg.merchantAccount], originMerchants: { [new URL(cfg.merchantUrl).origin]: cfg.merchantAccount } });
       const inv = r.invoice;
       if (inv) log(job.name, `402 ${inv.resource} · invoice ${usd(inv.amount)} · id ${short(inv.payment_id, 6, 4)}`, { payment_id: inv.payment_id, amount: inv.amount });
       const p = r.payment;

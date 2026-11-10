@@ -84,9 +84,24 @@ export function isPaymentId(id: string): boolean {
   return /^[0-9a-f]{64}$/.test(id);
 }
 
-/** Message the agent signs to bind a payment proof to itself and the resource (2-lld.md section 4). */
-export function proofMessage(paymentId: string, resource: string): string {
-  return `orbit-near:v1:${paymentId}:${resource}`;
+export interface ProofFields {
+  /** Payee account from the invoice. */
+  merchant: string;
+  /** Origin (scheme://host[:port]) the agent requested. */
+  origin: string;
+  payment_id: string;
+  /** Hash of the transaction that paid this invoice. */
+  tx_hash: string;
+  /** "<METHOD> <full URL>" from the invoice. */
+  resource: string;
+}
+
+/**
+ * Message the agent signs for X-PAYMENT (v3): binds the transaction receipt, payee,
+ * origin and resource, so none can be changed by a proof observer.
+ */
+export function proofMessage(p: ProofFields): string {
+  return `orbit-near:v3:${p.merchant}:${p.origin}:${p.payment_id}:${p.tx_hash}:${p.resource}`;
 }
 
 /** Decodes the final PayResult from a tx outcome, or the panic code of a failed pay receipt. */
@@ -179,9 +194,9 @@ export class OrbitAgent {
     return this.kp.getPublicKey().toString();
   }
 
-  /** Base64 ed25519 signature over `orbit-near:v1:<payment_id>:<resource>` (the X-PAYMENT `sig`). */
-  signProof(paymentId: string, resource: string): string {
-    return Buffer.from(this.kp.sign(new TextEncoder().encode(proofMessage(paymentId, resource))).signature).toString('base64');
+  /** Base64 ed25519 signature over `orbit-near:v3:<merchant>:<origin>:<payment_id>:<tx_hash>:<resource>`. */
+  signProof(p: ProofFields): string {
+    return Buffer.from(this.kp.sign(new TextEncoder().encode(proofMessage(p))).signature).toString('base64');
   }
 
   /** Pays one invoice. Resolves with a definite outcome, or `unknown` after polling past deadline + grace. */
