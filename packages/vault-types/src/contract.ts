@@ -10,7 +10,7 @@ export type OutcomeKind = 'paid' | 'failed' | 'rejected';
 export type PayStatus = 'pending' | 'paid' | 'failed';
 export type PayResultStatus = 'paid' | 'failed' | 'rejected';
 
-/** The 10 reason codes, in the contract's policy-check order, plus `transfer_failed` for settlement. */
+/** Contract policy and settlement reason codes. */
 export const REASON_CODES = [
   'duplicate_payment',
   'expired',
@@ -20,6 +20,7 @@ export const REASON_CODES = [
   'over_per_payment_limit',
   'over_agent_daily_count',
   'over_agent_daily_limit',
+  'over_workspace_daily_limit',
   'over_org_daily_limit',
   'insufficient_vault_balance',
   'transfer_failed',
@@ -54,6 +55,8 @@ export interface CountsView {
 export interface AgentView {
   id: number;
   name: string;
+  /** Missing only on older deployed vaults; those agents belong to the general workspace. */
+  workspace_id?: number;
   pk: string;
   status: AgentStatus;
   per_payment_limit: BaseUnits;
@@ -69,6 +72,15 @@ export interface AgentView {
   max_payments_per_day?: number;
   /** Accepted payments today; at max_payments_per_day the next pay is rejected over_agent_daily_count. */
   payments_today?: number;
+}
+
+export interface WorkspaceView {
+  id: number;
+  name: string;
+  daily_limit: BaseUnits;
+  spent_today: BaseUnits;
+  reserved: BaseUnits;
+  remaining_today: BaseUnits;
 }
 
 export interface MerchantView {
@@ -105,6 +117,8 @@ export interface VaultState {
   org: OrgView;
   counts: CountsView;
   agents: AgentView[];
+  /** Absent on the original testnet vault. */
+  workspaces?: WorkspaceView[];
   merchants: MerchantView[];
   /** at most 100 entries; the in-flight amount is org.reserved */
   pending: PendingView[];

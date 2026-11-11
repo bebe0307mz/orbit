@@ -66,7 +66,8 @@ type State = {
   guardian_pk: string; owner: string; version: string; near: { balance: string; storage_usage: number };
   org: { daily_limit: string; spent_today: string; reserved: string; paused: boolean };
   counts: { paid: number; failed: number; rejected: number; next_seq: number };
-  agents: { id: number; name: string; pk: string; status: string; daily_limit: string; per_payment_limit: string; spent_today: string; reserved: string; remaining_today: string }[];
+  agents: { id: number; name: string; workspace_id?: number; pk: string; status: string; daily_limit: string; per_payment_limit: string; spent_today: string; reserved: string; remaining_today: string }[];
+  workspaces?: { id: number; name: string; daily_limit: string; spent_today: string; reserved: string; remaining_today: string }[];
   merchants: { account: string; name: string }[];
   pending_count: number;
   block_height: number;
@@ -75,7 +76,7 @@ type State = {
 const state = (ctx: Ctx) => ctx.rpc.view<State>(ctx.vault, 'state');
 
 function agentRow(a: State['agents'][number]): string {
-  return `  agent ${a.id} ${a.name} ${a.status} per-payment ${fmtUsdc(a.per_payment_limit)} daily ${fmtUsdc(a.daily_limit)} spent ${fmtUsdc(a.spent_today)} remaining ${fmtUsdc(a.remaining_today)}`;
+  return `  agent ${a.id} ${a.name} ${a.status} workspace ${a.workspace_id ?? 0} per-payment ${fmtUsdc(a.per_payment_limit)} daily ${fmtUsdc(a.daily_limit)} spent ${fmtUsdc(a.spent_today)} remaining ${fmtUsdc(a.remaining_today)}`;
 }
 
 async function showAgent(ctx: Ctx, id: number): Promise<void> {
@@ -122,11 +123,16 @@ async function registerOne(ctx: Ctx, name: string, pk: string): Promise<void> {
   if (per > daily) throw new CliError('per-payment above daily');
   await limitGuard(ctx, daily, 'agent');
   const allowance = allowanceOf(ctx);
+  const workspace = ctx.cmd.flags.workspace ? Number(ctx.cmd.flags.workspace) : undefined;
+  if (workspace !== undefined && !(await state(ctx)).workspaces?.some((w) => w.id === workspace)) {
+    throw new CliError(`workspace ${workspace} does not exist on this vault`);
+  }
   const r = await ownerCall(
     ctx,
-    'register_agent',
-    { name, public_key: pk, per_payment_limit: per.toString(), daily_limit: daily.toString(), allowance: allowance.toString() },
-    [`name ${name}`, `per-payment ${fmtUsdc(per)}`, `daily ${fmtUsdc(daily)}`, `key allowance ${fmtNear(allowance)}`],
+    workspace === undefined ? 'register_agent' : 'register_agent_in_workspace',
+    { name, public_key: pk, per_payment_limit: per.toString(), daily_limit: daily.toString(), allowance: allowance.toString(),
+      ...(workspace === undefined ? {} : { workspace_id: workspace }) },
+    [`name ${name}`, `workspace ${workspace ?? 0}`, `per-payment ${fmtUsdc(per)}`, `daily ${fmtUsdc(daily)}`, `key allowance ${fmtNear(allowance)}`],
   );
   await checkAgentKey(ctx, pk);
   await showAgent(ctx, Number(r.value));
@@ -149,6 +155,12 @@ async function status(ctx: Ctx): Promise<boolean> {
   const need = strict ? held : n(s.available) + n(s.reserved) - n(s.org.reserved);
   checks.push(['C2 token backing', bal >= need, `ft_balance_of ${bal} >= ${need}${strict ? '' : ' (available + withdrawals in flight; payments pending)'}`]);
   checks.push(['C3 counters (I9)', s.counts.next_seq === s.counts.paid + s.counts.failed + s.counts.rejected, JSON.stringify(s.counts)]);
+  if (s.workspaces) {
+    const workspaceReserved = s.workspaces.reduce((total, w) => total + n(w.reserved), 0n);
+    const agentReserved = s.agents.reduce((total, a) => total + n(a.reserved), 0n);
+    checks.push(['C4 workspace reservations', workspaceReserved === n(s.org.reserved) && agentReserved === n(s.org.reserved),
+      `workspaces ${workspaceReserved}, agents ${agentReserved}, org ${s.org.reserved}`]);
+  }
   const live = new Map(s.agents.filter((a) => a.status !== 'revoked').map((a) => [a.pk, a.name]));
   const bad: string[] = [];
   for (const k of keys.keys) {
@@ -163,6 +175,7 @@ async function status(ctx: Ctx): Promise<boolean> {
   ctx.out(`vault ${ctx.vault} (${ctx.cmd.network}) block ${s.block_height} version ${s.version}`);
   ctx.out(`  available ${fmtUsdc(s.available)} reserved ${fmtUsdc(s.reserved)} paid ${fmtUsdc(s.paid_total)} float cap ${fmtUsdc(s.float_cap)}`);
   ctx.out(`  org daily ${fmtUsdc(s.org.daily_limit)} spent ${fmtUsdc(s.org.spent_today)} in flight ${fmtUsdc(s.org.reserved)} ${s.org.paused ? 'PAUSED' : 'active'}`);
+  for (const w of s.workspaces ?? []) ctx.out(`  workspace ${w.id} ${w.name} daily ${w.id === 0 ? 'unlimited' : fmtUsdc(w.daily_limit)} spent ${fmtUsdc(w.spent_today)} in flight ${fmtUsdc(w.reserved)}`);
   ctx.out(`  surplus (unaccounted token balance) ${fmtUsdc(bal - held)}; pending ${s.pending_count}`);
   for (const a of s.agents) ctx.out(agentRow(a));
   for (const m of s.merchants) ctx.out(`  merchant ${m.account} (${m.name})`);
@@ -269,6 +282,19 @@ async function run(ctx: Ctx): Promise<void> {
     case 'remove-merchant':
       await ownerCall(ctx, 'remove_merchant', { account: f.account }, ['pending payments to it still settle']);
       return;
+    case 'create-workspace': {
+      const daily = usdcToBase(f.daily as string);
+      const r = await ownerCall(ctx, 'create_workspace', { name: f.name, daily_limit: daily.toString() },
+        [`workspace ${f.name}, daily ${fmtUsdc(daily)}`]);
+      ctx.out(`  workspace id ${r.value}`);
+      return;
+    }
+    case 'set-workspace-limit': {
+      const daily = usdcToBase(f.daily as string);
+      await ownerCall(ctx, 'set_workspace_daily_limit', { workspace_id: Number(f.workspace), limit: daily.toString() },
+        [`workspace ${f.workspace}, daily ${fmtUsdc(daily)}`]);
+      return;
+    }
     case 'register-agent': {
       if (f['from-dir']) {
         const dir = f['from-dir'] as string;

@@ -1,5 +1,5 @@
 // services/api shapes the dashboard reads (docs 4-data-api.md 4.6). Names follow the API, which wins over the UI spec.
-import type { AgentView, BaseUnits, CountsView, MerchantView, OutcomeKind, PendingView, Reason } from './contract.ts';
+import type { AgentView, BaseUnits, CountsView, MerchantView, OutcomeKind, PendingView, Reason, WorkspaceView } from './contract.ts';
 
 export type Network = 'mainnet' | 'testnet';
 
@@ -64,6 +64,7 @@ export interface DashboardState {
   org: ApiOrg;
   counts: CountsView;
   agents: ApiAgent[];
+  workspaces?: WorkspaceView[];
   merchants: MerchantView[];
   pending: PendingView[];
   pending_count: number;

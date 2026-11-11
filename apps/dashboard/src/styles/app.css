@@ -491,6 +491,19 @@ body {
 .page-description { color: var(--muted); font-size: 13px; line-height: 19px; margin: 8px 0 0; }
 .page-head .sum { margin-left: auto; padding: 7px 11px; border-radius: 100px; background: var(--bg-subtle); border: 1px solid var(--line); }
 .figs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 0 0 32px; }
+.workspace-section { margin: 0 0 26px; }
+.workspace-heading { display: flex; align-items: baseline; gap: 12px; margin-bottom: 12px; }
+.workspace-heading h2 { margin: 0; font-size: 15px; font-weight: 650; letter-spacing: -.02em; }
+.workspace-heading span { color: var(--muted); font-size: 12px; }
+.workspace-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
+.workspace-card { padding: 15px 17px; border: 1px solid var(--line); border-radius: 14px; background: var(--bg-subtle); }
+.workspace-card-top, .workspace-card-foot { display: flex; justify-content: space-between; gap: 8px; }
+.workspace-card-top { font-size: 13px; }
+.workspace-card-top span, .workspace-card-foot { color: var(--muted); font-size: 11px; }
+.workspace-card-value { margin: 15px 0 9px; font-size: 20px; font-weight: 650; letter-spacing: -.035em; }
+.workspace-card-value span { font-size: 12px; font-weight: 400; letter-spacing: 0; color: var(--muted); }
+.workspace-card-foot { margin-top: 10px; }
+.agent-workspace { display: block; margin-top: 3px; color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .055em; }
 .fig {
   min-height: 150px;
   padding: 19px 21px;
@@ -551,6 +564,8 @@ table.t tfoot td { background: color-mix(in srgb, var(--bg-subtle) 88%, var(--ac
   .t-title { font-size: 26px; line-height: 31px; }
   .page-description { max-width: 34ch; }
   .figs { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 26px; }
+  .workspace-heading { display: block; }
+  .workspace-heading span { display: block; margin-top: 3px; }
   .fig { min-height: 132px; padding: 16px; }
   .fig:first-child { grid-column: 1 / -1; min-height: 132px; padding: 16px; }
   .fig:last-child { grid-column: 1 / -1; min-height: 112px; }

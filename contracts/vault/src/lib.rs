@@ -28,6 +28,7 @@ pub const MAX_AGENT_ALLOWANCE: NearToken = NearToken::from_near(3);
 pub const GUARDIAN_ALLOWANCE: NearToken = NearToken::from_near(1);
 pub const STORAGE_FLOOR: NearToken = NearToken::from_millinear(500);
 pub const MAX_AGENTS: u32 = 50;
+pub const MAX_WORKSPACES: u32 = 16;
 pub const MAX_MERCHANTS: u32 = 20;
 pub const RING_SIZE: u64 = 256;
 pub const DEADLINE_WINDOW_MS: u64 = 600_000;
@@ -54,6 +55,7 @@ enum StorageKey {
     Payments,
     Pending,
     Ring,
+    Workspaces,
 }
 
 #[near(serializers = [borsh, json])]
@@ -99,6 +101,7 @@ pub enum Reason {
     TransferFailed = 10,
     /// Checked right after OverPerPaymentLimit (code value only names it; the check order is in `pay`).
     OverAgentDailyCount = 11,
+    OverWorkspaceDailyLimit = 12,
 }
 
 impl Reason {
@@ -115,6 +118,7 @@ impl Reason {
             Reason::InsufficientVaultBalance => "insufficient_vault_balance",
             Reason::TransferFailed => "transfer_failed",
             Reason::OverAgentDailyCount => "over_agent_daily_count",
+            Reason::OverWorkspaceDailyLimit => "over_workspace_daily_limit",
         }
     }
 
@@ -132,6 +136,7 @@ impl Reason {
             InsufficientVaultBalance,
             TransferFailed,
             OverAgentDailyCount,
+            OverWorkspaceDailyLimit,
         ]
         .into_iter()
         .find(|r| *r as u8 == code)
@@ -142,6 +147,7 @@ impl Reason {
 #[derive(Clone, Debug)]
 pub struct Agent {
     pub name: String,
+    pub workspace_id: u32,
     pub pk: PublicKey,
     pub per_payment_limit: u128,
     pub daily_limit: u128,
@@ -156,6 +162,30 @@ pub struct Agent {
     pub max_payments_per_day: u32,
     /// Accepted payments on `day` (reserved ones count; a refund does not give the slot back).
     pub payments_today: u32,
+}
+
+/// A budget partition within one vault. Agent membership is fixed at provisioning.
+#[near(serializers = [borsh])]
+#[derive(Clone, Debug)]
+pub struct Workspace {
+    pub name: String,
+    pub daily_limit: u128,
+    pub day: u32,
+    pub spent: u128,
+    pub reserved: u128,
+}
+
+impl Workspace {
+    fn roll(&mut self, today: u32) {
+        if self.day < today {
+            self.day = today;
+            self.spent = 0;
+        }
+    }
+
+    fn spent_on(&self, today: u32) -> u128 {
+        if self.day < today { 0 } else { self.spent }
+    }
 }
 
 impl Agent {
@@ -252,6 +282,7 @@ pub struct CountsView {
 pub struct AgentView {
     pub id: u32,
     pub name: String,
+    pub workspace_id: u32,
     pub pk: PublicKey,
     pub status: AgentStatus,
     pub per_payment_limit: U128,
@@ -264,6 +295,17 @@ pub struct AgentView {
     pub failed_count: u64,
     pub max_payments_per_day: u32,
     pub payments_today: u32,
+}
+
+#[near(serializers = [json])]
+#[derive(Clone, Debug)]
+pub struct WorkspaceView {
+    pub id: u32,
+    pub name: String,
+    pub daily_limit: U128,
+    pub spent_today: U128,
+    pub reserved: U128,
+    pub remaining_today: U128,
 }
 
 #[near(serializers = [json])]
@@ -303,6 +345,7 @@ pub struct StateView {
     pub org: OrgView,
     pub counts: CountsView,
     pub agents: Vec<AgentView>,
+    pub workspaces: Vec<WorkspaceView>,
     pub merchants: Vec<MerchantView>,
     pub pending: Vec<PendingView>,
     pub pending_count: u32,
@@ -431,6 +474,8 @@ pub struct Vault {
     org_spent: u128,
     org_reserved: u128,
     org_paused: bool,
+    workspaces: IterableMap<u32, Workspace>,
+    next_workspace_id: u32,
     agents: IterableMap<u32, Agent>,
     agent_by_pk: LookupMap<PublicKey, u32>,
     next_agent_id: u32,
@@ -467,6 +512,11 @@ impl Vault {
                 fail("E_ARGS", "mainnet build pins USDC and float_cap <= 20 USDC");
             }
         }
+        let mut workspaces = IterableMap::new(StorageKey::Workspaces);
+        // Workspace 0 preserves the original agent API and does not add a hidden cap.
+        workspaces.insert(0, Workspace {
+            name: "general".into(), daily_limit: u128::MAX, day: today(), spent: 0, reserved: 0,
+        });
         let mut this = Self {
             owner,
             token,
@@ -482,6 +532,8 @@ impl Vault {
             org_spent: 0,
             org_reserved: 0,
             org_paused: false,
+            workspaces,
+            next_workspace_id: 1,
             agents: IterableMap::new(StorageKey::Agents),
             agent_by_pk: LookupMap::new(StorageKey::AgentByPk),
             next_agent_id: 1,
@@ -563,6 +615,9 @@ impl Vault {
         self.roll_org(today);
         let mut agent = self.agents.get(&agent_id).cloned().unwrap();
         agent.roll(today);
+        let mut workspace = self.workspaces.get(&agent.workspace_id).cloned()
+            .unwrap_or_else(|| fail("E_STATE", "agent workspace missing"));
+        workspace.roll(today);
 
         // 3. Policy checks, fixed order; the first failure is the reason.
         let reason = if self.payments.contains_key(&pid) {
@@ -581,6 +636,8 @@ impl Vault {
             Some(Reason::OverAgentDailyCount)
         } else if add(add(agent.spent, agent.reserved), amount) > agent.daily_limit {
             Some(Reason::OverAgentDailyLimit)
+        } else if add(add(workspace.spent, workspace.reserved), amount) > workspace.daily_limit {
+            Some(Reason::OverWorkspaceDailyLimit)
         } else if add(add(self.org_spent, self.org_reserved), amount) > self.org_daily_limit {
             Some(Reason::OverOrgDailyLimit)
         } else if amount > self.available {
@@ -623,7 +680,10 @@ impl Vault {
         self.pending.insert(pid);
         agent.reserved = add(agent.reserved, amount);
         agent.payments_today += 1;
+        let workspace_id = agent.workspace_id;
         self.agents.insert(agent_id, agent);
+        workspace.reserved = add(workspace.reserved, amount);
+        self.workspaces.insert(workspace_id, workspace);
         self.org_reserved = add(self.org_reserved, amount);
         self.reserved = add(self.reserved, amount);
         self.available = sub(self.available, amount);
@@ -658,14 +718,19 @@ impl Vault {
         self.roll_org(today);
         let mut agent = self.agents.get(&p.agent_id).cloned().unwrap();
         agent.roll(today);
+        let mut workspace = self.workspaces.get(&agent.workspace_id).cloned()
+            .unwrap_or_else(|| fail("E_STATE", "agent workspace missing"));
+        workspace.roll(today);
 
         let a = p.amount;
         self.reserved = sub(self.reserved, a);
         agent.reserved = sub(agent.reserved, a);
+        workspace.reserved = sub(workspace.reserved, a);
         self.org_reserved = sub(self.org_reserved, a);
         let (kind, reason, status, event) = if ok {
             self.paid_total = add(self.paid_total, a);
             agent.spent = add(agent.spent, a);
+            workspace.spent = add(workspace.spent, a);
             self.org_spent = add(self.org_spent, a);
             agent.paid_count += 1;
             self.paid_count += 1;
@@ -681,7 +746,9 @@ impl Vault {
         let merchant = p.merchant.clone();
         self.payments.insert(pid, p);
         self.pending.remove(&pid);
+        let workspace_id = agent.workspace_id;
         self.agents.insert(agent_id, agent);
+        self.workspaces.insert(workspace_id, workspace);
         let seq = self.push_outcome(kind, agent_id, &pid, &merchant, a, reason);
         let reason_str = reason.map(|r| r.as_str().to_string());
         emit(
@@ -734,53 +801,50 @@ impl Vault {
         max_payments_per_day: Option<u32>,
     ) -> u32 {
         self.auth_owner();
-        let max_payments_per_day = Self::check_count(max_payments_per_day);
-        if !valid_name(&name) {
-            fail("E_ARGS", "name must be 1 to 32 chars [a-z0-9-]");
+        self.do_register_agent(name, public_key, per_payment_limit, daily_limit, allowance, max_payments_per_day, 0)
+    }
+
+    /// Provision an agent into an owner-created workspace. The assignment cannot be changed later.
+    #[payable]
+    pub fn register_agent_in_workspace(
+        &mut self,
+        name: String,
+        public_key: PublicKey,
+        per_payment_limit: U128,
+        daily_limit: U128,
+        allowance: U128,
+        max_payments_per_day: Option<u32>,
+        workspace_id: u32,
+    ) -> u32 {
+        self.auth_owner();
+        self.do_register_agent(name, public_key, per_payment_limit, daily_limit, allowance, max_payments_per_day, workspace_id)
+    }
+
+    #[payable]
+    pub fn create_workspace(&mut self, name: String, daily_limit: U128) -> u32 {
+        self.auth_owner();
+        if !valid_name(&name) || daily_limit.0 == 0 || self.workspaces.len() >= MAX_WORKSPACES
+            || self.workspaces.iter().any(|(_, w)| w.name == name) {
+            fail("E_ARGS", "invalid workspace name/limit or max 16 workspaces");
         }
-        if self.agent_by_pk.contains_key(&public_key) || public_key == self.guardian_pk {
-            fail("E_ARGS", "public key already used");
-        }
-        if per_payment_limit.0 > daily_limit.0 {
-            fail("E_ARGS", "per_payment_limit > daily_limit");
-        }
-        if self.active_agent_count >= MAX_AGENTS {
-            fail("E_ARGS", "max 50 non-revoked agents");
-        }
-        let allowance = Self::check_allowance(allowance);
-        let id = self.next_agent_id;
-        self.next_agent_id += 1;
-        self.agents.insert(
-            id,
-            Agent {
-                name: name.clone(),
-                pk: public_key.clone(),
-                per_payment_limit: per_payment_limit.0,
-                daily_limit: daily_limit.0,
-                day: today(),
-                spent: 0,
-                reserved: 0,
-                status: AgentStatus::Active,
-                paid_count: 0,
-                rejected_count: 0,
-                failed_count: 0,
-                max_payments_per_day,
-                payments_today: 0,
-            },
-        );
-        self.active_agent_count += 1;
-        self.agent_by_pk.insert(public_key.clone(), id);
-        let me = env::current_account_id();
-        Promise::new(me.clone())
-            .add_access_key_allowance(public_key.clone(), allowance, me, AGENT_METHODS)
-            .detach();
-        emit(
-            "agent_registered",
-            json!({"agent_id": id, "name": name, "pk": public_key,
-                   "per_payment_limit": per_payment_limit, "daily_limit": daily_limit,
-                   "max_payments_per_day": max_payments_per_day}),
-        );
+        let id = self.next_workspace_id;
+        self.next_workspace_id += 1;
+        self.workspaces.insert(id, Workspace {
+            name: name.clone(), daily_limit: daily_limit.0, day: today(), spent: 0, reserved: 0,
+        });
+        emit("workspace_created", json!({"workspace_id": id, "name": name, "daily_limit": daily_limit}));
         id
+    }
+
+    #[payable]
+    pub fn set_workspace_daily_limit(&mut self, workspace_id: u32, limit: U128) {
+        self.auth_owner();
+        if limit.0 == 0 { fail("E_ARGS", "workspace daily limit must be positive"); }
+        let mut workspace = self.workspaces.get(&workspace_id).cloned()
+            .unwrap_or_else(|| fail("E_ARGS", "unknown workspace"));
+        workspace.daily_limit = limit.0;
+        self.workspaces.insert(workspace_id, workspace);
+        emit("workspace_limit_set", json!({"workspace_id": workspace_id, "daily_limit": limit}));
     }
 
     #[payable]
@@ -1003,11 +1067,26 @@ impl Vault {
             .org_daily_limit
             .saturating_sub(org_spent)
             .saturating_sub(self.org_reserved);
+        let workspaces = self.workspaces.iter().map(|(id, workspace)| {
+            let spent = workspace.spent_on(today);
+            WorkspaceView {
+                id: *id,
+                name: workspace.name.clone(),
+                daily_limit: U128(workspace.daily_limit),
+                spent_today: U128(spent),
+                reserved: U128(workspace.reserved),
+                remaining_today: U128(workspace.daily_limit.saturating_sub(spent)
+                    .saturating_sub(workspace.reserved).min(org_remaining).min(self.available)),
+            }
+        }).collect::<Vec<_>>();
         let agents = self
             .agents
             .iter()
             .map(|(id, a)| {
                 let spent = a.spent_on(today);
+                let workspace_remaining = self.workspaces.get(&a.workspace_id)
+                    .map(|w| w.daily_limit.saturating_sub(w.spent_on(today)).saturating_sub(w.reserved))
+                    .unwrap_or(0);
                 let remaining = if a.status != AgentStatus::Active || self.org_paused || a.payments_on(today) >= a.max_payments_per_day {
                     0
                 } else {
@@ -1015,11 +1094,13 @@ impl Vault {
                         .saturating_sub(spent)
                         .saturating_sub(a.reserved)
                         .min(org_remaining)
+                        .min(workspace_remaining)
                         .min(self.available)
                 };
                 AgentView {
                     id: *id,
                     name: a.name.clone(),
+                    workspace_id: a.workspace_id,
                     pk: a.pk.clone(),
                     status: a.status,
                     per_payment_limit: U128(a.per_payment_limit),
@@ -1085,6 +1166,7 @@ impl Vault {
                 next_seq: self.next_seq,
             },
             agents,
+            workspaces,
             merchants,
             pending,
             pending_count: self.pending.len(),
@@ -1128,6 +1210,69 @@ impl Vault {
 // ---------- internals ----------
 
 impl Vault {
+    fn do_register_agent(
+        &mut self,
+        name: String,
+        public_key: PublicKey,
+        per_payment_limit: U128,
+        daily_limit: U128,
+        allowance: U128,
+        max_payments_per_day: Option<u32>,
+        workspace_id: u32,
+    ) -> u32 {
+        let max_payments_per_day = Self::check_count(max_payments_per_day);
+        if !valid_name(&name) {
+            fail("E_ARGS", "name must be 1 to 32 chars [a-z0-9-]");
+        }
+        if !self.workspaces.contains_key(&workspace_id) {
+            fail("E_ARGS", "unknown workspace");
+        }
+        if self.agent_by_pk.contains_key(&public_key) || public_key == self.guardian_pk {
+            fail("E_ARGS", "public key already used");
+        }
+        if per_payment_limit.0 > daily_limit.0 {
+            fail("E_ARGS", "per_payment_limit > daily_limit");
+        }
+        if self.active_agent_count >= MAX_AGENTS {
+            fail("E_ARGS", "max 50 non-revoked agents");
+        }
+        let allowance = Self::check_allowance(allowance);
+        let id = self.next_agent_id;
+        self.next_agent_id += 1;
+        self.agents.insert(
+            id,
+            Agent {
+                name: name.clone(),
+                workspace_id,
+                pk: public_key.clone(),
+                per_payment_limit: per_payment_limit.0,
+                daily_limit: daily_limit.0,
+                day: today(),
+                spent: 0,
+                reserved: 0,
+                status: AgentStatus::Active,
+                paid_count: 0,
+                rejected_count: 0,
+                failed_count: 0,
+                max_payments_per_day,
+                payments_today: 0,
+            },
+        );
+        self.active_agent_count += 1;
+        self.agent_by_pk.insert(public_key.clone(), id);
+        let me = env::current_account_id();
+        Promise::new(me.clone())
+            .add_access_key_allowance(public_key.clone(), allowance, me, AGENT_METHODS)
+            .detach();
+        emit(
+            "agent_registered",
+            json!({"agent_id": id, "name": name, "workspace_id": workspace_id, "pk": public_key,
+                   "per_payment_limit": per_payment_limit, "daily_limit": daily_limit,
+                   "max_payments_per_day": max_payments_per_day}),
+        );
+        id
+    }
+
     fn free_near(&self) -> u128 {
         let locked = (env::storage_usage() as u128).saturating_mul(env::storage_byte_cost().as_yoctonear());
         env::account_balance().as_yoctonear().saturating_sub(locked)

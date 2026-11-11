@@ -7,7 +7,8 @@
 //     when the contracts' commit changes; never a test or mainnet variant)
 //  3. tools/orbit-cli: token-deploy, deploy (guardian key from services/api keygen, float cap $20, org $5/day),
 //     storage-deposit (merchant, unlisted), add-merchant, token-mint 20, deposit 20
-//  4. agents: research-scout, price-watcher, summary-writer, invoice-bot and rogue-agent ($0.10 per payment, $1.00 a day).
+//  4. workspaces: research and operations; agents: research-scout, price-watcher, summary-writer,
+//     invoice-bot and rogue-agent ($0.10 per payment, $1.00 a day).
 //     demo/attack --burst registers its own fresh burst agent per run (3 NEAR allowance), so none is pre-registered.
 //  5. env: <keyDir>/demo.env (account ids and key paths, outside the repo) and demo/.env.demo (account ids only, gitignored)
 //
@@ -208,13 +209,28 @@ async function main() {
   }
   if (s.org.daily_limit !== String(Math.round(Number(ORG_DAILY) * 1e6))) await orbitCli(['set-org-limit', '--daily', ORG_DAILY]);
 
+  if (!s.workspaces) throw new Error('vault lacks workspace support; use a fresh DEMO_TAG with the current contract');
+  for (const [name, daily] of [['research', '1.50'], ['operations', '1.50']] as const) {
+    s = await vaultState();
+    const current = s.workspaces?.find((w) => w.name === name);
+    if (!current) await orbitCli(['create-workspace', '--name', name, '--daily', daily]);
+    else if (current.daily_limit !== String(Math.round(Number(daily) * 1e6))) {
+      await orbitCli(['set-workspace-limit', '--workspace', String(current.id), '--daily', daily]);
+    }
+  }
+
   for (const a of AGENTS) {
     const f = join(keyDir, a.file);
     const pk = existsSync(f) ? loadKey(f).keyPair.getPublicKey().toString() : keygen(f, acct.vault);
     s = await vaultState();
+    const workspaceName = a.name === 'research-scout' || a.name === 'summary-writer' ? 'research' : 'operations';
+    const workspace = s.workspaces?.find((w) => w.name === workspaceName);
+    if (!workspace) throw new Error(`workspace ${workspaceName} missing on ${acct.vault}`);
     const reg = s.agents.find((x) => x.pk === pk);
-    if (reg) log(`agent ${a.name}: registered as ${reg.id}`);
-    else await orbitCli(['register-agent', '--name', a.name, '--public-key', pk, '--daily', DAILY, '--per-payment', PER_PAYMENT]);
+    if (reg) {
+      if (reg.workspace_id !== workspace.id) throw new Error(`agent ${a.name} has workspace ${reg.workspace_id}, expected ${workspace.id}; use a fresh DEMO_TAG`);
+      log(`agent ${a.name}: registered as ${reg.id} in ${workspaceName}`);
+    } else await orbitCli(['register-agent', '--name', a.name, '--public-key', pk, '--daily', DAILY, '--per-payment', PER_PAYMENT, '--workspace', String(workspace.id)]);
   }
 
   s = await vaultState();

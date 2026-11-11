@@ -67,6 +67,13 @@ describe('grammar', () => {
     expect(parse(['withdraw', '--amount', '1.5', '--yes']).flags).toEqual({ amount: '1.5', yes: true });
   });
 
+  it('accepts bounded workspace commands and rejects invalid ids', () => {
+    expect(parsePaste('create-workspace --network testnet --name research --daily 1.50').flags).toEqual({ name: 'research', daily: '1.50' });
+    expect(parsePaste('set-workspace-limit --network testnet --workspace 2 --daily 0.25').flags.workspace).toBe('2');
+    expect(parsePaste(`register-agent --network testnet --name bot --public-key ${PK} --daily 1 --per-payment 0.10 --workspace 2`).flags.workspace).toBe('2');
+    expect(() => parsePaste('set-workspace-limit --network testnet --workspace 0 --daily 1')).toThrow(GrammarError);
+  });
+
   it('main() aborts a mutating command unless the operator types yes', async () => {
     process.env.VAULT_ACCOUNT_ID = 'v.testnet';
     process.env.OWNER_ACCOUNT_ID = 'o.testnet';

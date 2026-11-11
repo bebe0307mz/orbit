@@ -304,6 +304,21 @@ export function AgentsScreen({ route }: { route: Route }) {
             <strong>One shared daily budget protects {s.agents.filter((a) => a.status !== 'revoked').length} agent{s.agents.filter((a) => a.status !== 'revoked').length === 1 ? '' : 's'}.</strong>
             {' '}The vault reserves each payment on chain before transferring tokens, so simultaneous requests cannot spend past the organization limit.
           </p>
+          {s.workspaces?.some((w) => w.id !== 0) ? (
+            <section className="workspace-section" aria-label="Workspace budgets">
+              <div className="workspace-heading"><h2>Workspace budgets</h2><span>Each workspace shares the organization cap</span></div>
+              <div className="workspace-grid">
+                {s.workspaces.filter((w) => w.id !== 0).map((w) => (
+                  <div className="workspace-card" key={w.id}>
+                    <div className="workspace-card-top"><strong>{w.name}</strong><span>{s.agents.filter((a) => a.workspace_id === w.id && a.status !== 'revoked').length} agents</span></div>
+                    <div className="workspace-card-value">{fmtUsd(w.spent_today)} <span>of {fmtUsd(w.daily_limit)} today</span></div>
+                    <Meter value={toBig(w.spent_today) + toBig(w.reserved)} max={toBig(w.daily_limit)} label={`${w.name} spent and in-flight against daily limit`} />
+                    <div className="workspace-card-foot">{fmtUsd(w.remaining_today)} available · {fmtUsd(w.reserved)} in flight</div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          ) : null}
           <div className="operational-strip" aria-label="Fleet activity summary">
             <span><strong>{s.agents.filter((a) => a.status === 'active').length}</strong> active agents</span>
             <a href={hrefFor('activity', { status: 'pending' })}><strong>{s.pending_count}</strong> in flight <span aria-hidden="true">↗</span></a>
@@ -374,6 +389,9 @@ export function AgentsScreen({ route }: { route: Route }) {
                               <span className="nm">{a.name}</span>
                             </a>
                             <span className="id">#{a.id}</span>
+                            {a.workspace_id && s.workspaces?.find((w) => w.id === a.workspace_id) ? (
+                              <span className="agent-workspace">{s.workspaces.find((w) => w.id === a.workspace_id)!.name}</span>
+                            ) : null}
                           </td>
                           <td className="c-status"><StatusCell a={a} s={s} op={op} /></td>
                           <td className="c-spent r num" data-check={`agent.${a.id}.spent`} {...padTo(fmtUsd(a.spent_today), dec.spent)}>{fmtUsd(a.spent_today)}</td>

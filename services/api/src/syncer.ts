@@ -193,6 +193,7 @@ export class Syncer {
       org: { ...S.org, remaining_today: orgRemaining(S.org).toString() },
       counts: S.counts,
       agents: S.agents.map((a) => ({ ...a, last_paid_ms: lastPaid.get(a.id) ?? null })),
+      workspaces: S.workspaces,
       merchants: S.merchants,
       pending: S.pending,
       pending_count: S.pending_count,

@@ -97,6 +97,7 @@ export function mapState(v: VaultState, opts: { network: Network; vaultAccountId
     org: { ...v.org, remaining_today: orgRemaining(v.org).toString() },
     counts: v.counts,
     agents: v.agents.map((a) => ({ ...a, last_paid_ms: opts.lastPaid.get(a.id) ?? null })),
+    workspaces: v.workspaces,
     merchants: v.merchants,
     pending: v.pending,
     pending_count: v.pending_count,

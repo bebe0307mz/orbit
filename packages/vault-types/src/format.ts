@@ -99,6 +99,7 @@ export const REASON_LABELS: Record<Reason, string> = {
   over_per_payment_limit: 'Over per-payment limit',
   over_agent_daily_count: 'Over daily payment count',
   over_agent_daily_limit: 'Over agent daily limit',
+  over_workspace_daily_limit: 'Over workspace daily limit',
   over_org_daily_limit: 'Over org daily limit',
   insufficient_vault_balance: 'Vault balance too low',
   transfer_failed: 'Transfer failed, refunded',

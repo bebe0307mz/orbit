@@ -177,8 +177,10 @@ fn check(h: &H, quiescent: bool) {
     });
     assert_eq!((p, f, r), (s.counts.paid, s.counts.failed, s.counts.rejected), "P4 agent counts");
     let agent_reserved: u128 = s.agents.iter().map(|a| a.reserved.0).sum();
+    let workspace_reserved: u128 = s.workspaces.iter().map(|w| w.reserved.0).sum();
     let pending_sum: u128 = s.pending.iter().map(|p| p.amount.0).sum();
     assert_eq!(n(s.org.reserved), agent_reserved, "P5 org.reserved == sum(agent.reserved)");
+    assert_eq!(n(s.org.reserved), workspace_reserved, "P5 org.reserved == sum(workspace.reserved)");
     assert_eq!(n(s.org.reserved), pending_sum, "P5 org.reserved == sum(pending)");
     assert!(n(s.reserved) >= n(s.org.reserved), "P5 reserved >= org.reserved");
     if quiescent {
@@ -228,6 +230,77 @@ fn setup_with(n_agents: u32, per_payment: u128, daily: u128, org: u128, deposit:
 
 fn setup() -> H {
     setup_with(4, 100_000, 250_000, 1_000_000, 10_000_000)
+}
+
+#[test]
+fn workspace_caps_hold_across_agents_and_failed_transfers_refund_all_levels() {
+    fresh_chain();
+    Ctx::new().apply();
+    let mut h = H { v: Vault::new(owner(), token(), guardian(), U128(20_000_000), U128(250_000)), ts: T0, balance: NearToken::from_near(20) };
+    h.as_owner();
+    h.v.add_merchant(m1(), "data".into());
+    h.as_owner();
+    let research = h.v.create_workspace("research".into(), U128(100_000));
+    h.as_owner();
+    let support = h.v.create_workspace("support".into(), U128(200_000));
+    assert_eq!((research, support), (1, 2));
+    for (id, workspace_id) in [(1, research), (2, research), (3, support), (4, support)] {
+        h.as_owner();
+        assert_eq!(h.v.register_agent_in_workspace(format!("a{id}"), agent_pk(id), U128(50_000),
+            U128(200_000), U128(10u128.pow(24)), None, workspace_id), id);
+    }
+    Ctx { pred: token(), ..h.ctx() }.apply();
+    assert!(matches!(h.v.ft_on_transfer(owner(), U128(1_000_000), String::new()), PromiseOrValue::Value(U128(0))));
+
+    // A failed token transfer gives the workspace, agent, org and vault reservation back.
+    assert!(h.pay_raw(1, &pid(0), m1(), 50_000).is_none());
+    check(&h, false);
+    assert_eq!(h.settle(&pid(0), false).status, "failed");
+    check(&h, true);
+    assert_eq!(h.view().workspaces.iter().find(|w| w.id == research).unwrap().spent_today.0, 0);
+
+    // Reserve before settling to exercise concurrent policy checks, not only sequential spend.
+    let mut accepted = Vec::new();
+    let mut rejected = Vec::new();
+    for i in 1..=20 {
+        let agent_id = ((i - 1) % 4 + 1) as u32;
+        let id = pid(i);
+        if let Some(r) = h.pay_raw(agent_id, &id, m1(), 50_000) {
+            rejected.push(r.reason.unwrap());
+        } else {
+            accepted.push(id);
+        }
+        check(&h, false);
+    }
+    assert_eq!(accepted.len(), 5);
+    assert_eq!(rejected.len(), 15);
+    assert!(rejected.contains(&"over_workspace_daily_limit".to_string()));
+    assert!(rejected.contains(&"over_org_daily_limit".to_string()));
+    for id in accepted { assert_eq!(h.settle(&id, true).status, "paid"); check(&h, false); }
+    check(&h, true);
+    let s = h.view();
+    assert_eq!(s.org.spent_today.0, 250_000);
+    assert_eq!(s.workspaces.iter().find(|w| w.id == research).unwrap().spent_today.0, 100_000);
+    assert_eq!(s.workspaces.iter().find(|w| w.id == support).unwrap().spent_today.0, 150_000);
+    assert_eq!(s.agents.iter().find(|a| a.id == 1).unwrap().workspace_id, research);
+}
+
+#[test]
+fn workspace_management_is_owner_only_and_existing_agents_use_general() {
+    let mut h = setup();
+    assert!(h.view().agents.iter().all(|a| a.workspace_id == 0));
+    h.as_agent(1);
+    expect_panic("E_AUTH", || { h.v.create_workspace("rogue".into(), U128(100_000)); });
+    h.as_owner();
+    expect_panic("E_ARGS", || { h.v.register_agent_in_workspace("bad".into(), pk(90), U128(10_000),
+        U128(20_000), U128(10u128.pow(24)), None, 99); });
+    h.as_owner();
+    let id = h.v.create_workspace("new".into(), U128(50_000));
+    h.as_owner();
+    expect_panic("E_ARGS", || { h.v.create_workspace("new".into(), U128(50_000)); });
+    h.as_owner();
+    h.v.set_workspace_daily_limit(id, U128(60_000));
+    assert_eq!(h.view().workspaces.iter().find(|w| w.id == id).unwrap().daily_limit.0, 60_000);
 }
 
 // ---------- keys (I11) ----------

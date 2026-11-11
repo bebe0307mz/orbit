@@ -11,7 +11,7 @@ const FORBIDDEN_RE = /[;|&`$<>\\'"(){}\n\r\t*?!#~]/;
 type FlagType = 'usdc' | 'near' | 'agent' | 'name' | 'pk' | 'account' | 'network' | 'path' | 'text' | 'bool';
 
 const FLAGS: Record<string, FlagType> = {
-  network: 'network', agent: 'agent', name: 'name', 'public-key': 'pk', daily: 'usdc', 'per-payment': 'usdc',
+  network: 'network', agent: 'agent', workspace: 'agent', name: 'name', 'public-key': 'pk', daily: 'usdc', 'per-payment': 'usdc',
   allowance: 'near', amount: 'usdc', account: 'account', pk: 'pk', 'guardian-pk': 'pk', 'float-cap': 'usdc',
   'org-daily': 'usdc', wasm: 'path', 'from-dir': 'path', to: 'account', 'allow-unregistered': 'bool', yes: 'bool',
   'i-mean-it': 'bool',
@@ -27,7 +27,9 @@ export const VERBS: Record<string, { req: string[]; opt: string[]; mutates: bool
   'storage-deposit': { req: ['account'], opt: [], mutates: true },
   'add-merchant': { req: ['account', 'name'], opt: ['allow-unregistered'], mutates: true },
   'remove-merchant': { req: ['account'], opt: [], mutates: true },
-  'register-agent': { req: ['daily', 'per-payment'], opt: ['name', 'public-key', 'allowance', 'from-dir'], mutates: true },
+  'create-workspace': { req: ['name', 'daily'], opt: [], mutates: true },
+  'set-workspace-limit': { req: ['workspace', 'daily'], opt: [], mutates: true },
+  'register-agent': { req: ['daily', 'per-payment'], opt: ['name', 'public-key', 'allowance', 'from-dir', 'workspace'], mutates: true },
   'set-agent-limits': { req: ['agent', 'daily', 'per-payment'], opt: [], mutates: true },
   'set-org-limit': { req: ['daily'], opt: [], mutates: true },
   'refill-agent': { req: ['agent', 'allowance'], opt: [], mutates: true },
@@ -45,7 +47,7 @@ export const VERBS: Record<string, { req: string[]; opt: string[]; mutates: bool
 
 /** Verbs a pasted UI string may name (no deploy, upgrade, token, paste or hash-password). */
 export const PASTE_VERBS = new Set([
-  'register-agent', 'set-agent-limits', 'set-org-limit', 'refill-agent', 'pause-agent', 'pause-all', 'resume-agent',
+  'create-workspace', 'set-workspace-limit', 'register-agent', 'set-agent-limits', 'set-org-limit', 'refill-agent', 'pause-agent', 'pause-all', 'resume-agent',
   'resume-all', 'revoke-agent', 'add-merchant', 'remove-merchant', 'deposit', 'withdraw', 'rotate-guardian', 'status',
 ]);
 
