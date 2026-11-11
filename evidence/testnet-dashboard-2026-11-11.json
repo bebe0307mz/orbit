@@ -1,12 +1,12 @@
 {
   "title": "Dashboard and services/api on testnet (harness/ui/check-testnet.mjs)",
   "vault": "orbit-ws-11a7-vault.testnet",
-  "block_height": 277189365,
+  "block_height": 277190119,
   "counts": {
-    "paid": 16,
+    "paid": 17,
     "failed": 0,
     "rejected": 5,
-    "next_seq": 21
+    "next_seq": 22
   },
   "checks": [
     {
@@ -17,12 +17,12 @@
     {
       "check": "syncer caught up: last_seq == next_seq - 1",
       "ok": true,
-      "detail": "last_seq 20, next_seq 21"
+      "detail": "last_seq 21, next_seq 22"
     },
     {
       "check": "counts match the chain (no gap)",
       "ok": true,
-      "detail": "{\"paid\":16,\"failed\":0,\"rejected\":5}"
+      "detail": "{\"paid\":17,\"failed\":0,\"rejected\":5}"
     },
     {
       "check": "guardian startup check: key is exactly FunctionCall pause_agent,pause_all on the vault",
@@ -37,12 +37,12 @@
     {
       "check": "/v1/health ok (fresh, counts match)",
       "ok": true,
-      "detail": "snapshot age 2751 ms"
+      "detail": "snapshot age 3875 ms"
     },
     {
       "check": "activity serves every outcome in the ring (before_seq cursor to the end)",
       "ok": true,
-      "detail": "21 outcomes in 1 pages, next_seq 21"
+      "detail": "22 outcomes in 1 pages, next_seq 22"
     },
     {
       "check": "api mode: every figure equals /v1/state in both themes at 1440 and 390",
