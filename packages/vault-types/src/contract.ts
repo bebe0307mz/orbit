@@ -63,7 +63,7 @@ export interface AgentView {
   daily_limit: BaseUnits;
   spent_today: BaseUnits;
   reserved: BaseUnits;
-  /** 0 unless active and the org is not paused; else min(own, org remaining, available), floored at 0 */
+  /** 0 when paused, at the daily payment-count cap, or missing a workspace; else min(agent, workspace, org, vault headroom). */
   remaining_today: BaseUnits;
   paid_count: number;
   rejected_count: number;

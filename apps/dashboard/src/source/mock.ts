@@ -217,7 +217,8 @@ export class MockSource implements VaultSource {
   private recomputeRemaining(): void {
     const s = this.state!;
     s.org.remaining_today = orgRemaining(s.org).toString();
-    for (const a of s.agents) a.remaining_today = agentRemaining(a, s.org, s.vault.available).toString();
+    for (const a of s.agents) a.remaining_today = agentRemaining(a, s.org, s.vault.available,
+      s.workspaces?.find((w) => w.id === a.workspace_id)).toString();
   }
 
   simulateOwnerRegister(f: Required<RegisterFields>): void {

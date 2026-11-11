@@ -1,6 +1,6 @@
 // Every number on screen, as a formula over one snapshot (docs 2-lld.md 8, 3-contract.md 3.3 Views).
 // Pure functions over base-unit strings; the UI formats the results.
-import type { AgentView, BaseUnits, OrgView, VaultState } from './contract.ts';
+import type { AgentView, BaseUnits, OrgView, VaultState, WorkspaceView } from './contract.ts';
 import type { DashboardState, OutcomeItem } from './api.ts';
 import { dayOf, toBig } from './format.ts';
 
@@ -36,27 +36,38 @@ export function vaultBindsOrg(org: Pick<OrgView, 'daily_limit' | 'spent_today' |
 
 /** The contract's `remaining_today` rule, for checking a snapshot and for the mock. */
 export function agentRemaining(
-  a: Pick<AgentView, 'status' | 'daily_limit' | 'spent_today' | 'reserved'>,
+  a: Pick<AgentView, 'status' | 'daily_limit' | 'spent_today' | 'reserved' | 'workspace_id' | 'payments_today' | 'max_payments_per_day'>,
   org: Pick<OrgView, 'daily_limit' | 'spent_today' | 'reserved' | 'paused'>,
   available: BaseUnits,
+  workspace?: Pick<WorkspaceView, 'daily_limit' | 'spent_today' | 'reserved'>,
 ): bigint {
   if (a.status !== 'active' || org.paused) return 0n;
+  if (a.max_payments_per_day != null && a.payments_today != null && a.payments_today >= a.max_payments_per_day) return 0n;
   const own = toBig(a.daily_limit) - toBig(a.spent_today) - toBig(a.reserved);
-  return max0(bmin(own, orgRemainingRaw(org), toBig(available)));
+  const workspaceRaw = workspace
+    ? toBig(workspace.daily_limit) - toBig(workspace.spent_today) - toBig(workspace.reserved)
+    : a.workspace_id == null ? own : 0n;
+  return max0(bmin(own, orgRemainingRaw(org), workspaceRaw, toBig(available)));
 }
 
-export type Binding = 'org' | 'vault' | null;
+export type Binding = 'org' | 'workspace' | 'vault' | 'count' | null;
 
 /** Which limit binds an agent's remaining: null when it is the agent's own daily limit. */
 export function agentBinding(
-  a: Pick<AgentView, 'daily_limit' | 'spent_today' | 'reserved'>,
+  a: Pick<AgentView, 'daily_limit' | 'spent_today' | 'reserved' | 'workspace_id' | 'payments_today' | 'max_payments_per_day'>,
   org: Pick<OrgView, 'daily_limit' | 'spent_today' | 'reserved'>,
   available: BaseUnits,
+  workspace?: Pick<WorkspaceView, 'daily_limit' | 'spent_today' | 'reserved'>,
 ): Binding {
+  if (a.max_payments_per_day != null && a.payments_today != null && a.payments_today >= a.max_payments_per_day) return 'count';
   const own = toBig(a.daily_limit) - toBig(a.spent_today) - toBig(a.reserved);
   const o = orgRemainingRaw(org);
+  const w = workspace
+    ? toBig(workspace.daily_limit) - toBig(workspace.spent_today) - toBig(workspace.reserved)
+    : a.workspace_id == null ? own : 0n;
   const v = toBig(available);
-  if (own <= o && own <= v) return null;
+  if (own <= o && own <= w && own <= v) return null;
+  if (w <= o && w <= v) return 'workspace';
   return o <= v ? 'org' : 'vault';
 }
 
@@ -102,7 +113,8 @@ export function checkSnapshot(s: DashboardState, outcomes?: OutcomeItem[]): stri
     sumSpent += toBig(a.spent_today);
     sumRes += toBig(a.reserved);
     eq(`agent ${a.name} reserved vs pending`, a.reserved, sumAmounts(s.pending.filter((p) => p.agent_id === a.id)));
-    eq(`agent ${a.name} remaining_today rule`, a.remaining_today, agentRemaining(a, s.org, v.available));
+    eq(`agent ${a.name} remaining_today rule`, a.remaining_today,
+      agentRemaining(a, s.org, v.available, s.workspaces?.find((w) => w.id === a.workspace_id)));
     if (toBig(a.per_payment_limit) > toBig(a.daily_limit)) issues.push(`agent ${a.name} per_payment_limit > daily_limit`);
     if (!/^(active|paused|revoked)$/.test(a.status)) issues.push(`agent ${a.name} status not a lowercase enum: ${a.status}`);
   }

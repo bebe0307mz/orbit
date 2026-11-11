@@ -41,11 +41,11 @@ function RemCell({ a, s, dec }: { a: ApiAgent; s: DashboardState; dec: number })
       </span>
     );
   }
-  const b = agentBinding(a, s.org, s.vault.available);
+  const b = agentBinding(a, s.org, s.vault.available, s.workspaces?.find((w) => w.id === a.workspace_id));
   return (
     <span className="rem">
       <span className="num" data-check={`agent.${a.id}.remaining`} {...padTo(fmtUsd(a.remaining_today), dec)}>{fmtUsd(a.remaining_today)}</span>
-      <span className="bind">{b === 'org' ? 'org limit' : b === 'vault' ? 'vault' : ''}</span>
+      <span className="bind">{b === 'org' ? 'org limit' : b === 'workspace' ? 'workspace cap' : b === 'vault' ? 'vault' : b === 'count' ? 'payment count' : ''}</span>
     </span>
   );
 }

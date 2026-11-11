@@ -46,7 +46,8 @@ export function AgentPanel({ id, onClose, onPause }: { id: number; onClose: () =
   const op = ops[String(a.id)];
   const opBusy = !!op && op.phase !== 'failed' && op.phase !== 'unresolved';
   const allBusy = !!ops.all && ops.all.phase !== 'failed' && ops.all.phase !== 'unresolved';
-  const b = agentBinding(a, s.org, s.vault.available);
+  const workspace = s.workspaces?.find((w) => w.id === a.workspace_id);
+  const b = agentBinding(a, s.org, s.vault.available, workspace);
   const orgLeft = orgRemaining(s.org);
   const kvDec = maxDecimals([a.daily_limit, a.per_payment_limit, s.org.daily_limit, s.vault.available].map((x) => fmtUsd(x)));
   const txDec = maxDecimals([...pend, ...mine].map((x) => fmtUsd(x.amount)));
@@ -83,6 +84,8 @@ export function AgentPanel({ id, onClose, onPause }: { id: number; onClose: () =
                 <div className="bind-line"><Dot cls="warn hollow" />Limited by org daily limit · <span className="num">{fmtUsd(orgLeft)}</span> left of {fmtUsd(s.org.daily_limit)}</div>
               ) : null}
               {b === 'vault' ? <div className="bind-line"><Dot cls="warn hollow" />Limited by vault balance · {fmtUsd(s.vault.available)} available</div> : null}
+              {b === 'workspace' && workspace ? <div className="bind-line"><Dot cls="warn hollow" />Limited by {workspace.name} workspace · {fmtUsd(workspace.remaining_today)} available of {fmtUsd(workspace.daily_limit)} daily limit</div> : null}
+              {b === 'count' ? <div className="bind-line"><Dot cls="warn hollow" />Daily payment count reached</div> : null}
             </>
           ) : (
             <div className="today">

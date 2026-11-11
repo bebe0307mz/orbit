@@ -50,7 +50,11 @@ export function expected(s, outcomes) {
   for (const a of s.agents) {
     const k = `agent.${a.id}.`;
     const own = big(a.daily_limit) - big(a.spent_today) - big(a.reserved);
-    const rem = a.status !== 'active' || s.org.paused ? 0n : max0(min(own, orgRaw, A));
+    const workspace = s.workspaces?.find((w) => w.id === a.workspace_id);
+    const workspaceRaw = workspace ? big(workspace.daily_limit) - big(workspace.spent_today) - big(workspace.reserved)
+      : a.workspace_id == null ? own : 0n;
+    const atCount = a.max_payments_per_day != null && a.payments_today != null && a.payments_today >= a.max_payments_per_day;
+    const rem = a.status !== 'active' || s.org.paused || atCount ? 0n : max0(min(own, workspaceRaw, orgRaw, A));
     want[k + 'remaining'] = fmtUsd(rem);
     want[k + 'spent'] = fmtUsd(a.spent_today); want[k + 'reserved'] = fmtUsd(a.reserved);
     want[k + 'daily'] = fmtUsd(a.daily_limit); want[k + 'per'] = fmtUsd(a.per_payment_limit);

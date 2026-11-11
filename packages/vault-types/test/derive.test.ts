@@ -54,6 +54,15 @@ describe('remaining_today rule (3-contract 3.3)', () => {
     expect(agentRemaining(a, org, '100000')).toBe(100000n);
     expect(agentBinding(a, org, '100000')).toBe('vault');
   });
+  it('workspace cap and daily payment count bind', () => {
+    const assigned = { ...a, workspace_id: 2, payments_today: 3, max_payments_per_day: 10 };
+    const workspace = { daily_limit: '500000', spent_today: '500000', reserved: '0' };
+    expect(agentRemaining(assigned, org, '20000000', workspace)).toBe(0n);
+    expect(agentBinding(assigned, org, '20000000', workspace)).toBe('workspace');
+    expect(agentRemaining({ ...assigned, payments_today: 10 }, org, '20000000', workspace)).toBe(0n);
+    expect(agentBinding({ ...assigned, payments_today: 10 }, org, '20000000', workspace)).toBe('count');
+    expect(agentRemaining(assigned, org, '20000000')).toBe(0n);
+  });
   it('0 when paused, revoked or org paused', () => {
     expect(agentRemaining({ ...a, status: 'paused' }, org, '20000000')).toBe(0n);
     expect(agentRemaining({ ...a, status: 'revoked' }, org, '20000000')).toBe(0n);

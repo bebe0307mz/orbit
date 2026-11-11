@@ -11,10 +11,10 @@ This is a factual build status, not a hackathon strategy document.
 - Version 1.1 testnet vault `orbit-ws-11a7-vault.testnet`: code hash matched the local build; two owner-created workspaces, five restricted agent keys and 20 open-mint test tokens were provisioned. A final 402 purchase from the research workspace and matching token transfer passed `node scripts/verify-public-proof.mjs evidence/testnet-workspace-audit-2026-11-11.json`.
 - Live operations-workspace burst: two keys submitted 20 concurrent $0.10 payments; 15 paid, five were rejected by the $1.50 workspace cap, and the merchant received exactly 1.50 test tokens. `node scripts/verify-workspace-burst.mjs` passed against public final RPC transactions and events.
 - The API migrated its SQLite outcome constraint without losing existing rows and synced the version 1.1 testnet vault: 16 paid, five rejected, no gap, and database counts match the vault. API migration and integration tests passed 41/41.
+- The version 1.1 RPC and API dashboards passed 73 live-vault checks after the independent expected-value formula was updated for workspace limits. The operations workspace is exhausted; its three agents correctly show $0.00 spendable and a workspace-cap label. See [dashboard evidence](evidence/testnet-dashboard-2026-11-11.json).
 
 ## In progress
 
-- Full sandbox and end-to-end dashboard checks against the new vault.
 - Three-minute public demo capture and submission content.
 
 ## Not demonstrated
