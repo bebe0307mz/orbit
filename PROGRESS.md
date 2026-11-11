@@ -12,6 +12,7 @@ This is a factual build status, not a hackathon strategy document.
 - Live operations-workspace burst: two keys submitted 20 concurrent $0.10 payments; 15 paid, five were rejected by the $1.50 workspace cap, and the merchant received exactly 1.50 test tokens. `node scripts/verify-workspace-burst.mjs` passed against public final RPC transactions and events.
 - The API migrated its SQLite outcome constraint without losing existing rows and synced the version 1.1 testnet vault: 16 paid, five rejected, no gap, and database counts match the vault. API migration and integration tests passed 41/41.
 - The version 1.1 RPC and API dashboards passed 73 live-vault checks after the independent expected-value formula was updated for workspace limits. The operations workspace is exhausted; its three agents correctly show $0.00 spendable and a workspace-cap label. See [dashboard evidence](evidence/testnet-dashboard-2026-11-11.json).
+- A fresh 11 November research-agent account diagnostic crossed HTTP 402 → vault payment → HTTP 200. Independent public RPC verification passed for its signed pay-only transaction, final vault event and test-token transfer. See [fresh audit](evidence/testnet-fresh-audit-2026-11-11.json).
 
 ## In progress
 

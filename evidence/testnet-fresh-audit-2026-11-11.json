@@ -1,0 +1,19 @@
+{
+  "network": "near:testnet",
+  "vault": "orbit-ws-11a7-vault.testnet",
+  "token": "orbit-ws-11a7-token.testnet",
+  "merchant": "orbit-ws-11a7-merchant.testnet",
+  "workspace_id": 1,
+  "workspace_name": "research",
+  "amount_base_units": "10000",
+  "payment_id": "9593fc34dc080b8e378d73f0a665d5c9fa6ec224e6b007374c003054acebc20e",
+  "tx_hash": "FSaoxkDUWe1naQjCvkJAdhiELbPfsKokM8vNiMJRhuF4",
+  "explorer_url": "https://testnet.nearblocks.io/txns/FSaoxkDUWe1naQjCvkJAdhiELbPfsKokM8vNiMJRhuF4",
+  "code_hash": "3vbtUo6vh8ojXtNYFc8X4aW5YFJSD2d6derDdhhxmy7e",
+  "token_classification": "Open-mint demo token with no monetary value",
+  "resource": "NEAR account diagnostic for near.testnet fetched from public final RPC data",
+  "marketplace_assignment": false,
+  "workspace_concurrency_proven_by_this_purchase": false,
+  "captured_at_utc": "2026-11-11T08:18:00Z",
+  "http_result": "HTTP 200 for near.testnet at final block 277189529 after a 402 invoice"
+}
