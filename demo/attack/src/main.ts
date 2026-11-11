@@ -192,6 +192,57 @@ export async function burst(cfg: AttackConfig, opts: { count?: number; amount?: 
   return classifyBurst(cfg, agent, Number(reg.value), name, outs, deadline, { count, amount, daily });
 }
 
+/** Live proof that two distinct agent keys share one workspace budget. Uses valueless test tokens. */
+export async function workspaceBurst(cfg: AttackConfig): Promise<boolean> {
+  if (cfg.network !== 'testnet') throw new Error('workspace burst is testnet only');
+  const initial = await cfg.rpc.view<{ token: string; org: { daily_limit: string; spent_today: string; reserved: string }; workspaces?: { id: number; name: string; daily_limit: string; spent_today: string; reserved: string }[]; agents: { id: number; name: string; workspace_id: number }[] }>(cfg.vault, 'state');
+  const workspace = initial.workspaces?.find((w) => w.name === 'operations');
+  if (!workspace || workspace.daily_limit !== '1500000' || workspace.spent_today !== '0' || workspace.reserved !== '0') {
+    throw new Error('operations workspace must have a fresh $1.50 budget with no prior payments');
+  }
+  if (BigInt(initial.org.daily_limit) - BigInt(initial.org.spent_today) - BigInt(initial.org.reserved) < 1_500_000n) {
+    throw new Error('organization must have at least $1.50 budget left');
+  }
+  const names = ['price-watcher', 'invoice-bot'];
+  const agents = names.map((name) => {
+    const row = initial.agents.find((a) => a.name === name && a.workspace_id === workspace.id);
+    if (!row) throw new Error(`${name} is not registered in operations`);
+    return { row, agent: new OrbitAgent({ vault: cfg.vault, rpc: cfg.rpc,
+      key: join(cfg.keyDir, `demo-${name}.json`), maxInFlight: 10, reportUrl: cfg.apiUrl }) };
+  });
+  const before = BigInt(await cfg.rpc.view<string>(initial.token, 'ft_balance_of', { account_id: cfg.merchant }));
+  const deadline = Date.now() + 180_000;
+  const attempts = agents.flatMap(({ agent }) => Array.from({ length: 10 }, () => ({ id: pid(), agent })));
+  cfg.out('operations workspace: 2 keys submit 20 concurrent $0.10 payments against a $1.50 cap');
+  const first = await Promise.all(attempts.map(({ id, agent }) => agent.pay({ payment_id: id, merchant: cfg.merchant, amount: '100000', deadline_ms: deadline })));
+  const resolved = await Promise.all(first.map((o, i) => o.status === 'unknown' ? attempts[i]!.agent.resolve(o.payment_id, o.tx_hash, deadline) : o));
+  const final = await cfg.rpc.view<{ org: { reserved: string }; workspaces: { id: number; spent_today: string; reserved: string }[]; agents: { id: number; reserved: string }[]; counts: { next_seq: number } }>(cfg.vault, 'state');
+  const after = BigInt(await cfg.rpc.view<string>(initial.token, 'ft_balance_of', { account_id: cfg.merchant }));
+  const ring = new Map<string, { kind: string; reason: string | null }>();
+  for (let from = Math.max(0, final.counts.next_seq - 256); from < final.counts.next_seq;) {
+    const page = await cfg.rpc.view<{ entries: { seq: number; payment_id: string; kind: string; reason: string | null }[] }>(cfg.vault, 'outcomes', { from_seq: from, limit: 100 });
+    if (!page.entries.length) break;
+    for (const entry of page.entries) ring.set(entry.payment_id, { kind: entry.kind, reason: entry.reason });
+    from = page.entries.at(-1)!.seq + 1;
+  }
+  const outcomes = resolved.map((o) => ring.get(o.payment_id));
+  const paid = outcomes.filter((o) => o?.kind === 'paid').length;
+  const rejected = outcomes.filter((o) => o?.kind === 'rejected' && o.reason === 'over_workspace_daily_limit').length;
+  for (let i = 0; i < resolved.length; i++) {
+    const o = resolved[i]!;
+    cfg.proof?.tx(`${names[Math.floor(i / 10)]} ${i % 10 + 1}: ${outcomes[i]?.kind ?? o.status}`, o);
+  }
+  const workspaceFinal = final.workspaces.find((w) => w.id === workspace.id);
+  const checks: [string, boolean, string][] = [
+    ['all 20 payments classified in final outcome ring', outcomes.every(Boolean), `${outcomes.filter(Boolean).length}/20`],
+    ['exact workspace cap under two keys', paid === 15 && rejected === 5, `${paid} paid, ${rejected} workspace rejections`],
+    ['merchant received exactly 1.50 test tokens', after - before === 1_500_000n, `delta ${after - before}`],
+    ['workspace spent and reservations reconcile', workspaceFinal?.spent_today === '1500000' && workspaceFinal.reserved === '0' && final.org.reserved === '0' && final.agents.every((a) => a.reserved === '0'), JSON.stringify(workspaceFinal)],
+  ];
+  for (const [name, ok, detail] of checks) { cfg.out(`${ok ? 'PASS' : 'FAIL'} ${name}: ${detail}`); cfg.proof?.check(name, ok, detail); }
+  return checks.every(([, ok]) => ok);
+}
+
 export interface BurstReport {
   paid: number;
   rejected: number;
@@ -277,6 +328,11 @@ async function main(argv: string[]): Promise<number> {
   const flag = (n: string) => argv.includes(`--${n}`);
   const agentName = argv[argv.indexOf('--agent') + 1];
   try {
+    if (flag('workspace-burst')) {
+      const ok = await workspaceBurst(cfg);
+      await cfg.proof?.write(cfg, 'Workspace proof: two-key 20-payment testnet burst');
+      return ok ? 0 : 1;
+    }
     if (flag('burst')) {
       const r = await burst(cfg);
       await cfg.proof?.write(cfg, 'Attack proof: 20-payment burst (demo/attack --burst)');

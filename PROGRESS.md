@@ -8,10 +8,12 @@ This is a factual build status, not a hackathon strategy document.
 - Original sandbox: 20 concurrent payments from four agents against one organization cap; 5 paid, 15 rejected. See `evidence/sandbox-shared-cap-t14b.json`.
 - Version 1.1 local tests: workspace limits, four-agent reservation burst, failed-transfer refund across all budget levels, owner-only workspace controls. `cargo test -p orbit-vault --lib` passed 27 tests on 11 November.
 - CLI, demo-agent, dashboard and API type checks passed after the workspace change; CLI, demo-agent and dashboard tests passed.
+- Version 1.1 testnet vault `orbit-ws-11a7-vault.testnet`: code hash matched the local build; two owner-created workspaces, five restricted agent keys and 20 open-mint test tokens were provisioned. A final 402 purchase from the research workspace and matching token transfer passed `node scripts/verify-public-proof.mjs evidence/testnet-workspace-audit-2026-11-11.json`.
+- Live operations-workspace burst: two keys submitted 20 concurrent $0.10 payments; 15 paid, five were rejected by the $1.50 workspace cap, and the merchant received exactly 1.50 test tokens. `node scripts/verify-workspace-burst.mjs` passed against public final RPC transactions and events.
+- The API migrated its SQLite outcome constraint without losing existing rows and synced the version 1.1 testnet vault: 16 paid, five rejected, no gap, and database counts match the vault. API migration and integration tests passed 41/41.
 
 ## In progress
 
-- Fresh version 1.1 testnet vault deployment with two workspaces and live payment evidence.
 - Full sandbox and end-to-end dashboard checks against the new vault.
 - Three-minute public demo capture and submission content.
 

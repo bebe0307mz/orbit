@@ -1,0 +1,167 @@
+{
+  "title": "Workspace proof: two-key 20-payment testnet burst",
+  "network": "testnet",
+  "vault": "orbit-ws-11a7-vault.testnet",
+  "block_height": 277146668,
+  "counts": {
+    "paid": 16,
+    "failed": 0,
+    "rejected": 5,
+    "next_seq": 21
+  },
+  "checks": [
+    {
+      "check": "all 20 payments classified in final outcome ring",
+      "ok": true,
+      "detail": "20/20"
+    },
+    {
+      "check": "exact workspace cap under two keys",
+      "ok": true,
+      "detail": "15 paid, 5 workspace rejections"
+    },
+    {
+      "check": "merchant received exactly 1.50 test tokens",
+      "ok": true,
+      "detail": "delta 1500000"
+    },
+    {
+      "check": "workspace spent and reservations reconcile",
+      "ok": true,
+      "detail": "{\"id\":2,\"name\":\"operations\",\"daily_limit\":\"1500000\",\"spent_today\":\"1500000\",\"reserved\":\"0\",\"remaining_today\":\"0\"}"
+    },
+    {
+      "check": "vault conservation (I7) after the run",
+      "ok": true,
+      "detail": "20000000 = 18490000+0+1510000+0"
+    }
+  ],
+  "txs": [
+    {
+      "step": "price-watcher 1: paid",
+      "tx": "5bdwczaTDPu5gvq8JmkgJ2BhAAEiBifvGuS6LJgLgHLq",
+      "link": "https://testnet.nearblocks.io/txns/5bdwczaTDPu5gvq8JmkgJ2BhAAEiBifvGuS6LJgLgHLq",
+      "result": "{\"status\":\"paid\",\"reason\":null,\"seq\":1}"
+    },
+    {
+      "step": "price-watcher 2: paid",
+      "tx": "1283KZ1FvWvFEeHyvBKSSucGGwNGktLCwtvap8ebbTxP",
+      "link": "https://testnet.nearblocks.io/txns/1283KZ1FvWvFEeHyvBKSSucGGwNGktLCwtvap8ebbTxP",
+      "result": "{\"status\":\"paid\",\"reason\":null,\"seq\":5}"
+    },
+    {
+      "step": "price-watcher 3: paid",
+      "tx": "5XPAExWpBEKq5zwrUy9kdBJdMQoG3RisUMrL6gMnxqWC",
+      "link": "https://testnet.nearblocks.io/txns/5XPAExWpBEKq5zwrUy9kdBJdMQoG3RisUMrL6gMnxqWC",
+      "result": "{\"status\":\"paid\",\"reason\":null,\"seq\":7}"
+    },
+    {
+      "step": "price-watcher 4: paid",
+      "tx": "GPyAA15aDvjVJZbmfRa7q87RiCK1kXaneVWwCHcYFc1a",
+      "link": "https://testnet.nearblocks.io/txns/GPyAA15aDvjVJZbmfRa7q87RiCK1kXaneVWwCHcYFc1a",
+      "result": "{\"status\":\"paid\",\"reason\":null,\"seq\":9}"
+    },
+    {
+      "step": "price-watcher 5: paid",
+      "tx": "DgsAfxPXCcaZNaw86kvV4LLGn4TLuUg9PHtPZvRftrsH",
+      "link": "https://testnet.nearblocks.io/txns/DgsAfxPXCcaZNaw86kvV4LLGn4TLuUg9PHtPZvRftrsH",
+      "result": "{\"status\":\"paid\",\"reason\":null,\"seq\":11}"
+    },
+    {
+      "step": "price-watcher 6: paid",
+      "tx": "43vjYAwnbv9YvoWwMTiuXQLo6k2bkoAEQEGBVygaxMP1",
+      "link": "https://testnet.nearblocks.io/txns/43vjYAwnbv9YvoWwMTiuXQLo6k2bkoAEQEGBVygaxMP1",
+      "result": "{\"status\":\"paid\",\"reason\":null,\"seq\":12}"
+    },
+    {
+      "step": "price-watcher 7: paid",
+      "tx": "FhBXEsU5hXhRwRvXgCRnDN43cLJDSLfcmKdEdEq5DjQP",
+      "link": "https://testnet.nearblocks.io/txns/FhBXEsU5hXhRwRvXgCRnDN43cLJDSLfcmKdEdEq5DjQP",
+      "result": "{\"status\":\"paid\",\"reason\":null,\"seq\":17}"
+    },
+    {
+      "step": "price-watcher 8: rejected",
+      "tx": "Et2JRXUapLff9ybG2N4b2sGpHk15iRffPH1LjRyxyNP2",
+      "link": "https://testnet.nearblocks.io/txns/Et2JRXUapLff9ybG2N4b2sGpHk15iRffPH1LjRyxyNP2",
+      "result": "{\"status\":\"rejected\",\"reason\":\"over_workspace_daily_limit\",\"seq\":18}"
+    },
+    {
+      "step": "price-watcher 9: rejected",
+      "tx": "2kYizWsYt4dS9RYftcEyySJ3KL5MvoJ9V5MZVRStnum4",
+      "link": "https://testnet.nearblocks.io/txns/2kYizWsYt4dS9RYftcEyySJ3KL5MvoJ9V5MZVRStnum4",
+      "result": "{\"status\":\"rejected\",\"reason\":\"over_workspace_daily_limit\",\"seq\":19}"
+    },
+    {
+      "step": "price-watcher 10: rejected",
+      "tx": "DHfjEfbdSEdz8ZbwYyfiAcPt5ea82V7RcBT6Ed1E3ayT",
+      "link": "https://testnet.nearblocks.io/txns/DHfjEfbdSEdz8ZbwYyfiAcPt5ea82V7RcBT6Ed1E3ayT",
+      "result": "{\"status\":\"rejected\",\"reason\":\"over_workspace_daily_limit\",\"seq\":20}"
+    },
+    {
+      "step": "invoice-bot 1: paid",
+      "tx": "143iJR1SEUSwGaC3uA4v9M2BXDr96sHjfgpJ7hsNymkb",
+      "link": "https://testnet.nearblocks.io/txns/143iJR1SEUSwGaC3uA4v9M2BXDr96sHjfgpJ7hsNymkb",
+      "result": "{\"status\":\"paid\",\"reason\":null,\"seq\":2}"
+    },
+    {
+      "step": "invoice-bot 2: paid",
+      "tx": "3WPwDWaSxWvdpEnovZeDWmndT9jZKSkLpWheGMYcuapH",
+      "link": "https://testnet.nearblocks.io/txns/3WPwDWaSxWvdpEnovZeDWmndT9jZKSkLpWheGMYcuapH",
+      "result": "{\"status\":\"paid\",\"reason\":null,\"seq\":3}"
+    },
+    {
+      "step": "invoice-bot 3: paid",
+      "tx": "76AQPiHKURozgq75sjFEnvshoPBqeanGAN8KBPBXX7FS",
+      "link": "https://testnet.nearblocks.io/txns/76AQPiHKURozgq75sjFEnvshoPBqeanGAN8KBPBXX7FS",
+      "result": "{\"status\":\"paid\",\"reason\":null,\"seq\":4}"
+    },
+    {
+      "step": "invoice-bot 4: paid",
+      "tx": "AsUbGwLBtDh2gFymg6q3BTho3yNHrcC2BucECMctg2Wm",
+      "link": "https://testnet.nearblocks.io/txns/AsUbGwLBtDh2gFymg6q3BTho3yNHrcC2BucECMctg2Wm",
+      "result": "{\"status\":\"paid\",\"reason\":null,\"seq\":6}"
+    },
+    {
+      "step": "invoice-bot 5: paid",
+      "tx": "HJzX1Uuni2kL7MKqRs8GckxcaNyMoMNjF4PoQn2iWQfc",
+      "link": "https://testnet.nearblocks.io/txns/HJzX1Uuni2kL7MKqRs8GckxcaNyMoMNjF4PoQn2iWQfc",
+      "result": "{\"status\":\"paid\",\"reason\":null,\"seq\":8}"
+    },
+    {
+      "step": "invoice-bot 6: paid",
+      "tx": "FjaCKRbhYFZUrLX79Lz1eHbzc3uwi9ZJ2VUd23Cng4S7",
+      "link": "https://testnet.nearblocks.io/txns/FjaCKRbhYFZUrLX79Lz1eHbzc3uwi9ZJ2VUd23Cng4S7",
+      "result": "{\"status\":\"paid\",\"reason\":null,\"seq\":10}"
+    },
+    {
+      "step": "invoice-bot 7: paid",
+      "tx": "EKxQEPAY6ZPKkbajgEiJ2Mo6Mpa5xzrY4zsZEh3wkMh",
+      "link": "https://testnet.nearblocks.io/txns/EKxQEPAY6ZPKkbajgEiJ2Mo6Mpa5xzrY4zsZEh3wkMh",
+      "result": "{\"status\":\"paid\",\"reason\":null,\"seq\":13}"
+    },
+    {
+      "step": "invoice-bot 8: paid",
+      "tx": "AcCy6XrKxyCV1YNzxmrkfqNTH8Ps2MuqzoY1M5tpLS8E",
+      "link": "https://testnet.nearblocks.io/txns/AcCy6XrKxyCV1YNzxmrkfqNTH8Ps2MuqzoY1M5tpLS8E",
+      "result": "{\"status\":\"paid\",\"reason\":null,\"seq\":16}"
+    },
+    {
+      "step": "invoice-bot 9: rejected",
+      "tx": "E12YG6KjwiDyfC8itUaUYNZSYBVfhjTEpN2t46i4zhLi",
+      "link": "https://testnet.nearblocks.io/txns/E12YG6KjwiDyfC8itUaUYNZSYBVfhjTEpN2t46i4zhLi",
+      "result": "{\"status\":\"rejected\",\"reason\":\"over_workspace_daily_limit\",\"seq\":14}"
+    },
+    {
+      "step": "invoice-bot 10: rejected",
+      "tx": "HoC8gCDdawZved6oVZm2UrVgScUyH77UMovAJDyPT4eh",
+      "link": "https://testnet.nearblocks.io/txns/HoC8gCDdawZved6oVZm2UrVgScUyH77UMovAJDyPT4eh",
+      "result": "{\"status\":\"rejected\",\"reason\":\"over_workspace_daily_limit\",\"seq\":15}"
+    }
+  ],
+  "workspace_id": 2,
+  "workspace_name": "operations",
+  "amount_per_attempt_base_units": "100000",
+  "test_token": "orbit-ws-11a7-token.testnet",
+  "merchant": "orbit-ws-11a7-merchant.testnet",
+  "notes": "Two agent keys each submitted ten concurrent payments. The test token is open-mint and valueless; this does not prove a marketplace job or production-money limits."
+}

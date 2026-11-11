@@ -4,9 +4,10 @@ Orbit gives a business running several autonomous agents one shared spending bud
 
 Status: hackathon MVP, running on NEAR testnet with a test token (`otusd`, no value). Mainnet is not deployed. The Agent Market seller integration is implemented against its published API. A separate seller key and authenticated preflight passed on 10 November; the private draft has not been published and no live assignment has been processed.
 
-The public transaction evidence below refers to the original version 1.0 testnet vault. Version 1.1 workspace code and its tests are available in this repository, but it needs a **fresh vault deployment** because its on-chain storage layout changed. Do not upgrade the version 1.0 account with the version 1.1 WASM. See [progress](PROGRESS.md) for the live deployment status.
+The original version 1.0 testnet vault remains available as earlier evidence. A fresh version 1.1 vault is deployed at `orbit-ws-11a7-vault.testnet`; a live paid diagnostic and a separate two-agent workspace burst are publicly verifiable there. The new storage layout is incompatible with version 1.0 state: do not upgrade the older account with version 1.1 WASM. See [progress](PROGRESS.md) and the [evidence index](evidence/README.md).
 
 The [evidence index](evidence/README.md) records what has been observed, what was only tested with fixtures, and the remaining verification gates.
+The [architecture and security boundary](ARCHITECTURE.md) shows the payment path and each key's authority.
 
 For a short judge walkthrough, see the [90-second demo plan](DEMO.md).
 
@@ -38,7 +39,7 @@ An agent that pays for APIs needs spending authority. Giving it a wallet key mea
 
 Orbit puts every limit inside one NEAR contract. Each payment is checked and reserved in a single receipt, so the limits hold under any concurrency. On testnet, 20 simultaneous $0.05 payments from one agent against a $0.25 daily limit gave 5 paid and 15 rejected. The checked-in sandbox scenario `T-14b` tests the stronger fleet claim: 20 simultaneous payments from four agents against one $0.25 organization limit give 5 paid and 15 `over_org_daily_limit` rejections, with the merchant's token balance and final vault accounting checked.
 
-In version 1.1, owner-created workspaces partition that shared budget. A unit test reserves 20 payments from four agents assigned across two workspaces. The research workspace admits two payments under its $0.10 cap, operations admits three, and the $0.25 organization cap stops the rest. A failed token transfer restores the agent, workspace and organization reservations. This is **local test evidence** until the fresh testnet deployment and live purchase are recorded.
+In version 1.1, owner-created workspaces partition that shared budget. A unit test reserves 20 payments from four agents assigned across two workspaces. The research workspace admits two payments under its $0.10 cap, operations admits three, and the $0.25 organization cap stops the rest. A failed token transfer restores the agent, workspace and organization reservations. Separately, a **live testnet** run from two agents in the operations workspace settled 15 of 20 concurrent $0.10 payments against its $1.50 cap and rejected five. Run `node scripts/verify-workspace-burst.mjs` to independently recheck all 20 final transactions and events.
 
 ## NEAR features used
 

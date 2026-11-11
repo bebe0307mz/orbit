@@ -2,7 +2,8 @@
 // Recheck one published testnet purchase using only public final NEAR RPC data.
 import { readFile } from 'node:fs/promises';
 
-const evidence = JSON.parse(await readFile(new URL('../evidence/testnet-audit-2026-11-10.json', import.meta.url), 'utf8'));
+const evidenceFile = process.argv[2] || 'evidence/testnet-audit-2026-11-10.json';
+const evidence = JSON.parse(await readFile(new URL(`../${evidenceFile}`, import.meta.url), 'utf8'));
 const rpcUrl = process.env.ORBIT_RPC || 'https://test.rpc.fastnear.com';
 let rpcId = 0;
 
@@ -43,16 +44,24 @@ function eventRecords(tx, executor, standard, name) {
 
 try {
   check(evidence.network === 'near:testnet', 'evidence identifies a NEAR testnet purchase');
-  const [payment, state, keys, tx] = await Promise.all([
+  const [payment, state, keys, tx, account] = await Promise.all([
     view('payment', { payment_id: evidence.payment_id }),
     view('state'),
     rpc('query', { request_type: 'view_access_key_list', finality: 'final', account_id: evidence.vault }),
     rpc('tx', [evidence.tx_hash, evidence.vault]),
+    rpc('query', { request_type: 'view_account', finality: 'final', account_id: evidence.vault }),
   ]);
 
   check(payment?.status === 'paid' && payment.merchant === evidence.merchant && payment.amount === evidence.amount_base_units,
     'final vault payment is paid to the recorded merchant for the recorded amount');
   check(state.token === evidence.token, 'vault pins the recorded NEP-141 token');
+  if (evidence.code_hash) check(account.code_hash === evidence.code_hash, 'vault currently runs the recorded contract code hash');
+  if (evidence.workspace_id != null) {
+    const agent = state.agents.find((entry) => entry.id === payment.agent_id);
+    const workspace = state.workspaces?.find((entry) => entry.id === evidence.workspace_id);
+    check(agent?.workspace_id === evidence.workspace_id && workspace?.name === evidence.workspace_name,
+      'paying agent is assigned to the recorded workspace');
+  }
   check(!keys.keys.some((entry) => entry.access_key?.permission === 'FullAccess'), 'vault currently has no full-access key');
   const payKeys = keys.keys.filter((entry) => {
     const permission = entry.access_key?.permission?.FunctionCall;
@@ -88,6 +97,7 @@ try {
 
   console.log(`Verified public testnet transaction: ${evidence.explorer_url}`);
   console.log('Scope: one paid diagnostic and current key permissions; historical key permissions at the payment block are not checked.');
+  if (evidence.workspace_id != null) console.log('Workspace assignment is checked in current state; the separate concurrent workspace-cap result is not proven by this transaction.');
   console.log('The owner can still invoke the vault upgrade method; no full-access key does not imply immutable code.');
   console.log('The evidence labels this token open-mint and valueless; this script does not independently verify that classification.');
   console.log('This does not verify an Agent Market job, a shared-cap race, or production-value USDC.');

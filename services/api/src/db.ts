@@ -8,10 +8,7 @@ import type { Op, OpKind, OpStatus, OutcomeItem, SyncGap } from '@orbit/vault-ty
 const { DatabaseSync } = createRequire(import.meta.url)('node:sqlite') as typeof import('node:sqlite');
 type Database = InstanceType<typeof DatabaseSync>;
 
-const SCHEMA = `
-PRAGMA journal_mode = WAL;
-PRAGMA foreign_keys = ON;
-CREATE TABLE IF NOT EXISTS outcomes (
+const OUTCOMES_TABLE = `CREATE TABLE IF NOT EXISTS outcomes (
   seq           INTEGER PRIMARY KEY,
   kind          TEXT    NOT NULL CHECK (kind IN ('paid','failed','rejected')),
   agent_id      INTEGER NOT NULL,
@@ -21,16 +18,21 @@ CREATE TABLE IF NOT EXISTS outcomes (
   reason        TEXT    NULL CHECK (reason IS NULL OR reason IN (
                   'duplicate_payment','expired','org_paused','agent_paused',
                   'merchant_not_allowed','over_per_payment_limit','over_agent_daily_count','over_agent_daily_limit',
-                  'over_org_daily_limit','insufficient_vault_balance','transfer_failed')),
+                  'over_workspace_daily_limit','over_org_daily_limit','insufficient_vault_balance','transfer_failed')),
   block_height  INTEGER NOT NULL,
   timestamp_ms  INTEGER NOT NULL,
   tx_hash       TEXT    NULL,
   CHECK ((kind = 'paid') = (reason IS NULL))
-);
-CREATE INDEX IF NOT EXISTS outcomes_agent    ON outcomes (agent_id, seq DESC);
+);`;
+const OUTCOMES_INDEXES = `CREATE INDEX IF NOT EXISTS outcomes_agent    ON outcomes (agent_id, seq DESC);
 CREATE INDEX IF NOT EXISTS outcomes_merchant ON outcomes (merchant, seq DESC);
 CREATE INDEX IF NOT EXISTS outcomes_kind     ON outcomes (kind, seq DESC);
-CREATE INDEX IF NOT EXISTS outcomes_payment  ON outcomes (payment_id);
+CREATE INDEX IF NOT EXISTS outcomes_payment  ON outcomes (payment_id);`;
+const SCHEMA = `
+PRAGMA journal_mode = WAL;
+PRAGMA foreign_keys = ON;
+${OUTCOMES_TABLE}
+${OUTCOMES_INDEXES}
 CREATE TABLE IF NOT EXISTS sync_state (
   key    TEXT PRIMARY KEY,
   value  TEXT NOT NULL
@@ -83,6 +85,26 @@ export class Store {
     if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true });
     this.db = new DatabaseSync(path);
     this.db.exec(SCHEMA);
+    this.migrateOutcomesWorkspaceReason();
+  }
+
+  /** SQLite cannot widen a CHECK constraint in place. Preserve old indexed outcomes and their transaction hashes. */
+  private migrateOutcomesWorkspaceReason(): void {
+    const row = this.db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'outcomes'").get() as { sql: string };
+    if (row.sql.includes('over_workspace_daily_limit')) return;
+    this.db.exec('BEGIN');
+    try {
+      this.db.exec('ALTER TABLE outcomes RENAME TO outcomes_legacy');
+      this.db.exec(OUTCOMES_TABLE);
+      this.db.exec(`INSERT INTO outcomes (seq, kind, agent_id, payment_id, merchant, amount, reason, block_height, timestamp_ms, tx_hash)
+        SELECT seq, kind, agent_id, payment_id, merchant, amount, reason, block_height, timestamp_ms, tx_hash FROM outcomes_legacy`);
+      this.db.exec('DROP TABLE outcomes_legacy');
+      this.db.exec(OUTCOMES_INDEXES);
+      this.db.exec('COMMIT');
+    } catch (e) {
+      this.db.exec('ROLLBACK');
+      throw e;
+    }
   }
 
   close(): void {

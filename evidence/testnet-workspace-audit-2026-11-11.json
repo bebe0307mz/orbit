@@ -1,0 +1,17 @@
+{
+  "network": "near:testnet",
+  "vault": "orbit-ws-11a7-vault.testnet",
+  "token": "orbit-ws-11a7-token.testnet",
+  "merchant": "orbit-ws-11a7-merchant.testnet",
+  "workspace_id": 1,
+  "workspace_name": "research",
+  "amount_base_units": "10000",
+  "payment_id": "2b9a716e194aaf4eeacddc16bae515ccc4358d81eb035342ffe114f575eb0aae",
+  "tx_hash": "44frk6ey5rWXagSqANK9qoN8viidhCFFZRj66RJE8w6K",
+  "explorer_url": "https://testnet.nearblocks.io/txns/44frk6ey5rWXagSqANK9qoN8viidhCFFZRj66RJE8w6K",
+  "code_hash": "3vbtUo6vh8ojXtNYFc8X4aW5YFJSD2d6derDdhhxmy7e",
+  "token_classification": "Open-mint demo token with no monetary value",
+  "resource": "NEAR account diagnostic for near.testnet fetched from public final RPC data",
+  "marketplace_assignment": false,
+  "workspace_concurrency_proven_by_this_purchase": false
+}
