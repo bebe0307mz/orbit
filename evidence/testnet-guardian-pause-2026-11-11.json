@@ -1,0 +1,13 @@
+{
+  "network": "near:testnet",
+  "vault": "orbit-ws-11a7-vault.testnet",
+  "token_kind": "open-mint valueless test token",
+  "agent_id": 5,
+  "agent_name": "rogue-agent",
+  "guardian_pause_tx": "8UVZe85bL9c2QcPqXXkSRVXt4cvut6cSBDLpcMNss3Mc",
+  "rejected_payment_tx": "9VfQ6RqY8GRxcpqEmDBfXgmJ5EoecutuDBY9uGwZgusT",
+  "payment_id": "788d11ed857d0ce7637cdc67140e5faa781e8c9207619f02e4f5af91258e3794",
+  "merchant": "orbit-ws-11a7-merchant.testnet",
+  "amount_base_units": "10000",
+  "expected_reason": "agent_paused"
+}

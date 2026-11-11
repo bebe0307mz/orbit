@@ -33,6 +33,8 @@ The [10 November one-shot diagnostic](evidence/testnet-audit-2026-11-10.json) re
 
 Anyone can recheck that recorded purchase and the vault's current key permissions without credentials: `node scripts/verify-public-proof.mjs`. It reads public final NEAR testnet RPC state and exits nonzero on a mismatch. It does not prove a marketplace job or the separate sandbox concurrency result.
 
+A [live guardian pause proof](evidence/testnet-guardian-pause-2026-11-11.json) records `rogue-agent` being paused through the dashboard and its next testnet payment being rejected as `agent_paused`. Run `node scripts/verify-guardian-pause.mjs` to check the two final transactions, current key scopes, matching events and vault accounting through public RPC. The agent remains paused in the current testnet demo state.
+
 A [fresh testnet receipt-link proof](evidence/testnet-receipt-link-2026-10-30.json) records a 402 purchase after the merchant was changed to require the signed transaction hash to contain the matching final `payment_paid` event.
 
 ## The problem

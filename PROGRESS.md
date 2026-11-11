@@ -10,13 +10,14 @@ This is a factual build status, not a hackathon strategy document.
 - CLI, demo-agent, dashboard and API type checks passed after the workspace change; CLI, demo-agent and dashboard tests passed.
 - Version 1.1 testnet vault `orbit-ws-11a7-vault.testnet`: code hash matched the local build; two owner-created workspaces, five restricted agent keys and 20 open-mint test tokens were provisioned. A final 402 purchase from the research workspace and matching token transfer passed `node scripts/verify-public-proof.mjs evidence/testnet-workspace-audit-2026-11-11.json`.
 - Live operations-workspace burst: two keys submitted 20 concurrent $0.10 payments; 15 paid, five were rejected by the $1.50 workspace cap, and the merchant received exactly 1.50 test tokens. `node scripts/verify-workspace-burst.mjs` passed against public final RPC transactions and events.
-- The API migrated its SQLite outcome constraint without losing existing rows and synced the version 1.1 testnet vault: 17 paid, five rejected after the fresh audit, no gap, and database counts match the vault. API migration and integration tests passed 41/41.
+- The API migrated its SQLite outcome constraint without losing existing rows and synced the version 1.1 testnet vault: 17 paid, six rejected after the guardian test, no gap, and database counts match the vault. API migration and integration tests passed 41/41.
 - The version 1.1 RPC and API dashboards passed 73 live-vault checks after the independent expected-value formula was updated for workspace limits. The operations workspace is exhausted; its three agents correctly show $0.00 spendable and a workspace-cap label. See [dashboard evidence](evidence/testnet-dashboard-2026-11-11.json).
 - A fresh 11 November research-agent account diagnostic crossed HTTP 402 → vault payment → HTTP 200. Independent public RPC verification passed for its signed pay-only transaction, final vault event and test-token transfer. See [fresh audit](evidence/testnet-fresh-audit-2026-11-11.json).
+- The guardian key paused `rogue-agent` through the live testnet dashboard; its next pay was rejected as `agent_paused`. The pause harness passed 81 checks, and `node scripts/verify-guardian-pause.mjs` independently verified both final transactions, events and current key scopes. See [guardian proof](evidence/testnet-guardian-pause-2026-11-11.json).
 
 ## In progress
 
-- A 47-second local demo video draft was rendered from live dashboard screenshots and the exact fresh testnet purchase output. It is a labeled evidence slideshow in `harness/out/demo/orbit-demo-draft.mp4`, not a continuous screen recording. The final public demo post and submission content remain in progress.
+- A 62-second local demo video draft was rendered from live dashboard screenshots, the exact fresh testnet purchase output, the workspace burst and guardian pause. It is a labeled evidence slideshow in `harness/out/demo/orbit-demo-draft.mp4`, not a continuous screen recording. The final public demo post and submission content remain in progress.
 
 ## Not demonstrated
 

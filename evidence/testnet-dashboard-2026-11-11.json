@@ -1,33 +1,33 @@
 {
   "title": "Dashboard and services/api on testnet (harness/ui/check-testnet.mjs)",
   "vault": "orbit-ws-11a7-vault.testnet",
-  "block_height": 277190119,
+  "block_height": 277209086,
   "counts": {
     "paid": 17,
     "failed": 0,
-    "rejected": 5,
-    "next_seq": 22
+    "rejected": 6,
+    "next_seq": 23
   },
   "checks": [
     {
       "check": "rpc mode: every figure equals the vault state()",
       "ok": true,
-      "detail": "28 figures"
+      "detail": "27 figures"
     },
     {
       "check": "syncer caught up: last_seq == next_seq - 1",
       "ok": true,
-      "detail": "last_seq 21, next_seq 22"
+      "detail": "last_seq 22, next_seq 23"
     },
     {
       "check": "counts match the chain (no gap)",
       "ok": true,
-      "detail": "{\"paid\":17,\"failed\":0,\"rejected\":5}"
+      "detail": "{\"paid\":17,\"failed\":0,\"rejected\":6}"
     },
     {
       "check": "guardian startup check: key is exactly FunctionCall pause_agent,pause_all on the vault",
       "ok": true,
-      "detail": "allowance 1000000000000000000000000 yocto"
+      "detail": "allowance 999779769386143000000000 yocto"
     },
     {
       "check": "guardian public key equals state().guardian_pk",
@@ -37,12 +37,12 @@
     {
       "check": "/v1/health ok (fresh, counts match)",
       "ok": true,
-      "detail": "snapshot age 3875 ms"
+      "detail": "snapshot age 3260 ms"
     },
     {
       "check": "activity serves every outcome in the ring (before_seq cursor to the end)",
       "ok": true,
-      "detail": "22 outcomes in 1 pages, next_seq 22"
+      "detail": "23 outcomes in 1 pages, next_seq 23"
     },
     {
       "check": "api mode: every figure equals /v1/state in both themes at 1440 and 390",
