@@ -5,7 +5,7 @@ These files are reproducible observations, not a completed NEAR Hackathon submis
 
 ## Final product and presentation — 14 November 2026
 
-[72-second natural desktop walkthrough](demo.mp4) · [subtitles](demo.srt) · [exact actions and narration](../DEMO.md) · [26-second silent mobile treasury scroll](mobile-treasury-scroll.mp4).
+[81-second natural desktop walkthrough](demo.mp4) · [subtitles](demo.srt) · [exact actions and narration](../DEMO.md) · [26-second silent mobile treasury scroll](mobile-treasury-scroll.mp4).
 
 The final export uses authorized Zoe QUICK narration over real continuous app use. It starts with the shared-budget problem, scrolls through treasury controls, selects research-scout, follows its paid diagnostic into the useful report, then investigates a separate workspace-cap rejection. The report and its source disclosure are genuinely scrolled. No editorial slides, synthetic scrolling or fresh payment are used.
 

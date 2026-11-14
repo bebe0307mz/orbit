@@ -1,6 +1,8 @@
 # Orbit — treasury controls and purchased work
 
-[Watch the 72-second product walkthrough](evidence/demo.mp4). The application opens directly into treasury controls. The video explains selected interactions; it is a separate artifact.
+[Watch the 81-second product walkthrough](evidence/demo.mp4). The application opens directly into treasury controls. The video explains selected interactions; it is a separate artifact.
+
+Public read-only app: https://orbit-agent-treasury.lunarmouse9.chatgpt.site . [Public video](https://orbit-agent-treasury.lunarmouse9.chatgpt.site/demo.mp4) · [subtitles](https://orbit-agent-treasury.lunarmouse9.chatgpt.site/demo.srt).
 
 ## Run the product
 
@@ -42,16 +44,16 @@ These are read-only archival RPC checks and exit nonzero on unavailable or misma
 
 ## Natural product walkthrough
 
-The [72-second main video](evidence/demo.mp4) keeps the real desktop app visible from the first frame. At 1280×720, the agent table, shared budgets and docked agent controls can be compared together. It follows one investigation through actual scrolling and clicks, with pauses to read the result. The [26-second silent mobile treasury scroll](evidence/mobile-treasury-scroll.mp4) is supplementary responsive footage, not a second complete task demo.
+The [81-second main video](evidence/demo.mp4) keeps the real desktop app visible from the first frame. At 1280×720, the agent table, shared budgets and docked agent controls can be compared together. It follows one investigation through actual scrolling and clicks, with pauses to read the result. The [26-second silent mobile treasury scroll](evidence/mobile-treasury-scroll.mp4) is supplementary responsive footage, not a second complete task demo.
 
 | Time | Actual app interaction | Spoken explanation |
 |---|---|---|
 | 0–15s | Treasury loads from public RPC; available funds and shared budgets remain visible. | Agents need to buy data and tools. Orbit puts one shared budget on NEAR, enforced by the contract. |
 | 15–24s | Scroll the real treasury into its agent table. | Review available funds, today’s allowance and the agents sharing it. |
 | 24–36s | Select research-scout; scroll its docked detail through limits, pay-only scope and recent payments. | Its key can request payments only, within per-payment, agent and workspace limits. |
-| 36–51s | Follow the agent’s activity, choose Paid, expand recorded payment#21, open its account report, scroll the actual result and open its source disclosure. | See what the payment bought. The report is reconstructed at the saved delivery block; the original HTTP response was not preserved. |
-| 51–63s | Return to all Activity, filter Rejected, expand the separate recorded operations-workspace rejection#20 and scroll its actual reason. | The shared workspace cap rejected this distinct request; no payment tokens went out. |
-| 63–72s | Return to treasury funds and workspace limits. | Useful work and a shared spending boundary, using no-value test tokens on NEAR testnet. |
+| 36–60s | Follow the agent’s activity, choose Paid, expand recorded payment#21, open its account report, scroll the actual result and open its source disclosure. | The agent paid one cent in test tokens to check access keys for near.testnet. Four keys had full control, like administrator credentials; the account owner should confirm their holders. The historical report was rebuilt because the original response was not saved. |
+| 60–72s | Return to all Activity, filter Rejected, expand the separate recorded operations-workspace rejection#20 and scroll its actual reason. | The shared workspace cap rejected this distinct request; no payment tokens went out. |
+| 72–81s | Return to treasury funds and workspace limits. | Useful work and a shared spending boundary, using no-value test tokens on NEAR testnet. |
 
 The paid diagnostic and blocked operations request are separate recorded cases. This is current read-only inspection; the video performs no fresh purchase or pause. The optional race is not needed to complete the walkthrough.
 
