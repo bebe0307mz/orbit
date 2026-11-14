@@ -7,7 +7,7 @@ AI agents need to pay for data and tools.
 But with a separate wallet for every agent,
 
 3
-00:00:06,350 --> 00:00:08,110
+00:00:06,350 --> 00:00:08,291
 who keeps the whole team on budget?
 
 4
@@ -15,7 +15,7 @@ who keeps the whole team on budget?
 I built Orbit to give them one shared treasury on NEAR,
 
 5
-00:00:12,210 --> 00:00:14,390
+00:00:12,210 --> 00:00:14,779
 with spending limits enforced by the contract.
 
 6
@@ -27,7 +27,7 @@ Let me show you.
 Here are our available funds and today’s allowance.
 
 8
-00:00:20,180 --> 00:00:22,800
+00:00:20,180 --> 00:00:23,015
 I’ll scroll down to the agents sharing that budget.
 
 9
@@ -43,49 +43,49 @@ Its key can only request payments,
 with limits for each payment, the agent,
 
 12
-00:00:31,320 --> 00:00:32,740
+00:00:31,320 --> 00:00:33,166
 and the shared workspace.
 
 13
-00:00:41,000 --> 00:00:44,840
+00:00:35,400 --> 00:00:39,240
 Follow its activity, choose Paid, and open the account check.
 
 14
-00:00:45,220 --> 00:00:48,640
+00:00:39,620 --> 00:00:43,040
 Here’s what the payment bought: an account access report.
 
 15
-00:00:49,000 --> 00:00:52,835
+00:00:43,400 --> 00:00:47,235
 It’s reconstructed at the saved delivery block; the original response
 
 16
-00:00:52,860 --> 00:00:53,840
+00:00:47,260 --> 00:00:48,642
 wasn’t preserved.
 
 17
-00:01:02,800 --> 00:01:05,360
+00:00:50,500 --> 00:00:53,060
 Now let’s look at a separate recorded request.
 
 18
-00:01:05,940 --> 00:01:08,120
+00:00:53,640 --> 00:00:55,820
 It hit the operations workspace cap.
 
 19
-00:01:08,420 --> 00:01:11,360
+00:00:56,120 --> 00:00:59,060
 Open it, and we can see why it was rejected.
 
 20
-00:01:11,920 --> 00:01:13,040
+00:00:59,620 --> 00:01:00,955
 No tokens went out.
 
 21
-00:01:17,200 --> 00:01:20,500
+00:01:02,500 --> 00:01:05,800
 That’s Orbit: useful work and a shared spending boundary,
 
 22
-00:01:20,860 --> 00:01:21,620
+00:01:06,160 --> 00:01:06,920
 in one place.
 
 23
-00:01:22,120 --> 00:01:25,600
+00:01:07,420 --> 00:01:11,098
 This walkthrough uses no-value test tokens on NEAR testnet.

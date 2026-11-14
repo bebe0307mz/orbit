@@ -21,7 +21,7 @@ The original version 1.0 testnet vault remains available as earlier evidence. A 
 The [evidence index](evidence/README.md) records what has been observed, what was only tested with fixtures, and the remaining verification gates.
 The [architecture and security boundary](ARCHITECTURE.md) shows the payment path and each key's authority.
 
-Watch the [86-second product walkthrough](evidence/demo.mp4), or follow [DEMO.md](DEMO.md). The product opens into treasury controls. Purchased work is attached to its payment detail; the recorded 20-outcome stress test is optional supporting evidence. No new payment is sent by replay. A separate [silent mobile treasury scroll](evidence/mobile-treasury-scroll.mp4) preserves the responsive view.
+Watch the [72-second product walkthrough](evidence/demo.mp4), or follow [DEMO.md](DEMO.md). The product opens into treasury controls. Purchased work is attached to its payment detail; the recorded 20-outcome stress test is optional supporting evidence. No new payment is sent by replay. A separate [silent mobile treasury scroll](evidence/mobile-treasury-scroll.mp4) preserves the responsive view.
 
 ## Hackathon development window
 

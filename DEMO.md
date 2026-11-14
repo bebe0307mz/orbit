@@ -1,6 +1,6 @@
 # Orbit — treasury controls and purchased work
 
-[Watch the 86-second product walkthrough](evidence/demo.mp4). The application opens directly into treasury controls. The video explains selected interactions; it is a separate artifact.
+[Watch the 72-second product walkthrough](evidence/demo.mp4). The application opens directly into treasury controls. The video explains selected interactions; it is a separate artifact.
 
 ## Run the product
 
@@ -42,24 +42,24 @@ These are read-only archival RPC checks and exit nonzero on unavailable or misma
 
 ## Natural product walkthrough
 
-The [86-second main video](evidence/demo.mp4) keeps the real desktop app visible from the first frame. At 1280×720, the agent table, shared budgets and docked agent controls can be compared together. It follows one investigation through actual scrolling and clicks, with pauses to read the result. The [26-second silent mobile treasury scroll](evidence/mobile-treasury-scroll.mp4) is supplementary responsive footage, not a second complete task demo.
+The [72-second main video](evidence/demo.mp4) keeps the real desktop app visible from the first frame. At 1280×720, the agent table, shared budgets and docked agent controls can be compared together. It follows one investigation through actual scrolling and clicks, with pauses to read the result. The [26-second silent mobile treasury scroll](evidence/mobile-treasury-scroll.mp4) is supplementary responsive footage, not a second complete task demo.
 
 | Time | Actual app interaction | Spoken explanation |
 |---|---|---|
 | 0–15s | Treasury loads from public RPC; available funds and shared budgets remain visible. | Agents need to buy data and tools. Orbit puts one shared budget on NEAR, enforced by the contract. |
 | 15–24s | Scroll the real treasury into its agent table. | Review available funds, today’s allowance and the agents sharing it. |
-| 24–38s | Select research-scout; scroll its docked detail through limits, pay-only scope and recent payments. | Its key can request payments only, within per-payment, agent and workspace limits. |
-| 38–59s | Follow the agent’s activity, choose Paid, expand recorded payment#21, open its account report, scroll the actual result and open its source disclosure. | See what the payment bought. The report is reconstructed at the saved delivery block; the original HTTP response was not preserved. |
-| 59–77s | Return to all Activity, filter Rejected, expand the separate recorded operations-workspace rejection#20 and scroll its actual reason. | The shared workspace cap rejected this distinct request; no payment tokens went out. |
-| 77–86s | Return to treasury funds and workspace limits. | Useful work and a shared spending boundary, using no-value test tokens on NEAR testnet. |
+| 24–36s | Select research-scout; scroll its docked detail through limits, pay-only scope and recent payments. | Its key can request payments only, within per-payment, agent and workspace limits. |
+| 36–51s | Follow the agent’s activity, choose Paid, expand recorded payment#21, open its account report, scroll the actual result and open its source disclosure. | See what the payment bought. The report is reconstructed at the saved delivery block; the original HTTP response was not preserved. |
+| 51–63s | Return to all Activity, filter Rejected, expand the separate recorded operations-workspace rejection#20 and scroll its actual reason. | The shared workspace cap rejected this distinct request; no payment tokens went out. |
+| 63–72s | Return to treasury funds and workspace limits. | Useful work and a shared spending boundary, using no-value test tokens on NEAR testnet. |
 
 The paid diagnostic and blocked operations request are separate recorded cases. This is current read-only inspection; the video performs no fresh purchase or pause. The optional race is not needed to complete the walkthrough.
 
 ## Production and checks
 
-1920×1080, 30fps H264/AAC with authorized Zoe QUICK narration and ordinary synchronized [subtitles](evidence/demo.srt). Four continuous interaction segments retain their original capture timing; short tail pauses were trimmed between matching states. There are no explanatory slides, simulated scrolling, screenshot pans or invented successful operations. The real app occupies nearly the full frame. The source capture used the same production HTML/JS/CSS files on a local QA port, with the same public RPC configuration.
+1920×1080, 30fps H264/AAC with authorized Zoe QUICK narration and ordinary synchronized [subtitles](evidence/demo.srt). The original motion timing is preserved. Only visually unchanged waits were shortened, and every complete voice take is retained. Agent-panel and mobile scrolling use smaller genuine wheel movements with reading pauses. There are no explanatory slides, simulated scrolling, screenshot pans or invented successful operations. The real app occupies nearly the full frame. The source capture used the same production HTML/JS/CSS files on a local QA port, with the same public RPC configuration.
 
-The actual encoded MP4 was checked at 15 timestamps, fully decoded, and compared with the final narration using automated speech recognition. Audio levels were measured. Source screenshot sampling is about 13–15fps; repeated frames form the 30fps export. No independent human listening review is claimed. The [production manifest](evidence/production-manifest-2026-11-14.json) records exact media hashes and verification scope.
+The actual encoded MP4 was checked at 15 timestamps, fully decoded, and compared with the final narration using automated speech recognition. Audio levels were measured. Source screenshot sampling is about10–15fps; repeated frames form the30fps export. This is not native30fps screen recording; no synthetic scrolling or optical-flow interpolation is used. No independent human listening review is claimed. The [production manifest](evidence/production-manifest-2026-11-14.json) records exact media hashes and verification scope.
 
 A fresh source snapshot with no copied dependency directory installed the frozen lockfile from cached registry packages, passed **240 TypeScript tests** (three external transaction tests skipped), and built the dashboard. Dashboard has **42 tests**; merchant has **23 passing tests**, including the real HTTP/SDK delivery followed by a fixture cap rejection. That regression is not a new chain transaction; real shared-cap enforcement has separate Rust/sandbox evidence. Three build-script failure regressions and all 60 contrast pairs passed. The inspected saved Rust unit run passed 27 tests.
 
