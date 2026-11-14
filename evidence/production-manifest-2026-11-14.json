@@ -1,12 +1,12 @@
 {
   "schema": 1,
   "date": "2026-11-14",
-  "sourceBaseCommit": "35031f2f365921bd5af6283de3d070f79529a0d7",
+  "sourceBaseCommit": "49a55406bc2c9d41c16c8b68bc60fcc04c6412fa",
   "sourceFilesSha256": "e52ce0be8af3a4e19a43d66f68a36e59a86eb063baf80ac64aef03dc8cc91b0e",
   "video": {
     "path": "evidence/demo.mp4",
-    "sha256": "bef0e28b156213870fe20aa96451f4e3477f95ca2b736479461cd315421475b4",
-    "seconds": 81,
+    "sha256": "493e83cda49874ac573d53501638b83e816284725c4bec5b048dd879ddab2fdb",
+    "seconds": 63.333333333333336,
     "width": 1920,
     "height": 1080,
     "fps": 30,
@@ -22,34 +22,38 @@
     "syntheticScrolling": false,
     "reviewedEncodedFrameSeconds": [
       3,
-      20,
-      26,
-      31,
-      36,
-      39,
-      42,
-      45,
-      48,
-      51,
-      54,
-      57,
-      62,
-      68,
-      78
+      6.9,
+      12,
+      18,
+      23,
+      27,
+      30,
+      32.5,
+      35,
+      38,
+      41,
+      44,
+      47,
+      53,
+      59
     ],
     "fullDecodePassed": true,
-    "automatedSpeechAgreement": 0.9552238805970149,
-    "audioSpeed": 1.0,
+    "automatedSpeechAgreement": 0.9703504043126685,
+    "audioSpeed": 1.2,
     "sourceSampling": "Approximately10–15fps;30fps export repeats frames. No recording/screencast API was available.",
     "completeOriginalVoiceTakesPreserved": true,
     "longestGapBetweenVoiceTakesSeconds": 2.194,
     "restoredClippedWordEndingVerified": true,
     "editing": "Original scroll/click timing retained; only unchanged waiting intervals shortened. Agent-panel scrolling recaptured with23 small real wheel increments.",
-    "reportExplanation": "Purchase price and checked account, four full-control keys as administrator credentials, owner next step, plain historical-report disclosure."
+    "reportExplanation": "Purchase, checked account, four full-control keys as administrator credentials, owner next step. Historical-data labels remain in the UI; no spoken reconstruction digression.",
+    "baseSeconds": 76,
+    "playbackSpeed": 1.2,
+    "closing": "We built Orbit, a shared treasury for AI agent teams. Agents can buy the tools they need while spending stays within the team’s limits.",
+    "openingQuestionDelivery": "Curious delivery with a measured rising final-word pitch contour."
   },
   "subtitles": {
     "path": "evidence/demo.srt",
-    "sha256": "0d597145980d915af32d95de3a13aa1e530883a0de31db74e578abe52189543b"
+    "sha256": "ecc713a0029a7f55070887d25ed7a6a166c101ef074893a358eff65f1e67ae7f"
   },
   "checks": {
     "typescriptPassed": 240,
@@ -128,7 +132,7 @@
   "verificationReuse": "Product source unchanged from verified local commit4e8f855; this revision replaces media and its documentation only.",
   "publicEndpoints": {
     "app": "https://orbit-agent-treasury.lunarmouse9.chatgpt.site",
-    "demo": "https://orbit-agent-treasury.lunarmouse9.chatgpt.site/demo.mp4",
+    "demo": "https://orbit-agent-treasury.lunarmouse9.chatgpt.site/demo-1p2x.mp4",
     "subtitles": "https://orbit-agent-treasury.lunarmouse9.chatgpt.site/demo.srt"
   }
 }

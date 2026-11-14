@@ -6,7 +6,7 @@ Orbit is a shared on-chain spending firewall for agent teams: let agents pay for
 - **Solution:** pay-only agent keys, per-agent and shared workspace limits, receipt-backed payment history, and a separate pause-only guardian.
 - **Value:** automate permitted purchases, inspect the work bought, and investigate blocked requests with exact public receipts.
 
-**Try it:** [public read-only dashboard](https://orbit-agent-treasury.lunarmouse9.chatgpt.site) · [81-second product walkthrough](https://orbit-agent-treasury.lunarmouse9.chatgpt.site/demo.mp4) · [local setup and exact actions](DEMO.md) · [architecture](ARCHITECTURE.md) · [evidence](evidence/README.md). The public view reads NEAR testnet and holds no signing keys.
+**Try it:** [public read-only dashboard](https://orbit-agent-treasury.lunarmouse9.chatgpt.site) · [63-second product walkthrough](https://orbit-agent-treasury.lunarmouse9.chatgpt.site/demo-1p2x.mp4) · [local setup and exact actions](DEMO.md) · [architecture](ARCHITECTURE.md) · [evidence](evidence/README.md). The public view reads NEAR testnet and holds no signing keys.
 
 **Hackathon tracks:** AI Security & Defense (`security`) and Agent Economy (`agents`). Intended presenter and project owner: Zoe (`bebe0307mz`), as confirmed by the user. Authorized Zoe QUICK narration is used in the video. Development authorship is preserved in git history (`git shortlog -sn`); Codex assisted implementation, verification and production. Final submitting team membership must reflect the actual contributors.
 
@@ -21,7 +21,7 @@ The original version 1.0 testnet vault remains available as earlier evidence. A 
 The [evidence index](evidence/README.md) records what has been observed, what was only tested with fixtures, and the remaining verification gates.
 The [architecture and security boundary](ARCHITECTURE.md) shows the payment path and each key's authority.
 
-Watch the [81-second product walkthrough](evidence/demo.mp4), or follow [DEMO.md](DEMO.md). The product opens into treasury controls. Purchased work is attached to its payment detail; the recorded 20-outcome stress test is optional supporting evidence. No new payment is sent by replay. A separate [silent mobile treasury scroll](evidence/mobile-treasury-scroll.mp4) preserves the responsive view.
+Watch the [63-second product walkthrough](evidence/demo.mp4), or follow [DEMO.md](DEMO.md). The product opens into treasury controls. Purchased work is attached to its payment detail; the recorded 20-outcome stress test is optional supporting evidence. No new payment is sent by replay. A separate [silent mobile treasury scroll](evidence/mobile-treasury-scroll.mp4) preserves the responsive view.
 
 ## Hackathon development window
 

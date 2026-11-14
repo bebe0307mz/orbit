@@ -1,8 +1,8 @@
 # Orbit — treasury controls and purchased work
 
-[Watch the 81-second product walkthrough](evidence/demo.mp4). The application opens directly into treasury controls. The video explains selected interactions; it is a separate artifact.
+[Watch the 63-second product walkthrough](evidence/demo.mp4). The application opens directly into treasury controls. The video explains selected interactions; it is a separate artifact.
 
-Public read-only app: https://orbit-agent-treasury.lunarmouse9.chatgpt.site . [Public video](https://orbit-agent-treasury.lunarmouse9.chatgpt.site/demo.mp4) · [subtitles](https://orbit-agent-treasury.lunarmouse9.chatgpt.site/demo.srt).
+Public read-only app: https://orbit-agent-treasury.lunarmouse9.chatgpt.site . [Public video](https://orbit-agent-treasury.lunarmouse9.chatgpt.site/demo-1p2x.mp4) · [subtitles](https://orbit-agent-treasury.lunarmouse9.chatgpt.site/demo.srt).
 
 ## Run the product
 
@@ -44,22 +44,22 @@ These are read-only archival RPC checks and exit nonzero on unavailable or misma
 
 ## Natural product walkthrough
 
-The [81-second main video](evidence/demo.mp4) keeps the real desktop app visible from the first frame. At 1280×720, the agent table, shared budgets and docked agent controls can be compared together. It follows one investigation through actual scrolling and clicks, with pauses to read the result. The [26-second silent mobile treasury scroll](evidence/mobile-treasury-scroll.mp4) is supplementary responsive footage, not a second complete task demo.
+The [63-second main video](evidence/demo.mp4) keeps the real desktop app visible from the first frame. At 1280×720, the agent table, shared budgets and docked agent controls can be compared together. It follows one investigation through actual scrolling and clicks, with pauses to read the result. The [26-second silent mobile treasury scroll](evidence/mobile-treasury-scroll.mp4) is supplementary responsive footage, not a second complete task demo.
 
 | Time | Actual app interaction | Spoken explanation |
 |---|---|---|
-| 0–15s | Treasury loads from public RPC; available funds and shared budgets remain visible. | Agents need to buy data and tools. Orbit puts one shared budget on NEAR, enforced by the contract. |
-| 15–24s | Scroll the real treasury into its agent table. | Review available funds, today’s allowance and the agents sharing it. |
-| 24–36s | Select research-scout; scroll its docked detail through limits, pay-only scope and recent payments. | Its key can request payments only, within per-payment, agent and workspace limits. |
-| 36–60s | Follow the agent’s activity, choose Paid, expand recorded payment#21, open its account report, scroll the actual result and open its source disclosure. | The agent paid one cent in test tokens to check access keys for near.testnet. Four keys had full control, like administrator credentials; the account owner should confirm their holders. The historical report was rebuilt because the original response was not saved. |
-| 60–72s | Return to all Activity, filter Rejected, expand the separate recorded operations-workspace rejection#20 and scroll its actual reason. | The shared workspace cap rejected this distinct request; no payment tokens went out. |
-| 72–81s | Return to treasury funds and workspace limits. | Useful work and a shared spending boundary, using no-value test tokens on NEAR testnet. |
+| 0–13s | Treasury loads from public RPC; available funds and shared budgets remain visible. | Agents need to buy data and tools. Orbit puts one shared budget on NEAR, enforced by the contract. |
+| 13–20s | Scroll the real treasury into its agent table. | Review available funds, today’s allowance and the agents sharing it. |
+| 20–30s | Select research-scout; scroll its docked detail through limits, pay-only scope and recent payments. | Its key can request payments only, within per-payment, agent and workspace limits. |
+| 30–46s | Follow the agent’s activity, choose Paid, expand recorded payment#21, open its account report, scroll the actual result and open its source disclosure. | The agent paid one cent in test tokens to check access keys for near.testnet. Four keys had full control, like administrator credentials; the account owner should confirm their holders. Historical-source details remain visible in the report. |
+| 46–55s | Return to all Activity, filter Rejected, expand the separate recorded operations-workspace rejection#20 and scroll its actual reason. | The shared workspace cap rejected this distinct request; no payment tokens went out. |
+| 55–63s | Return to treasury funds and workspace limits. | We built Orbit, a shared treasury for AI agent teams: tools for the agents, with spending kept inside the team’s limits. |
 
 The paid diagnostic and blocked operations request are separate recorded cases. This is current read-only inspection; the video performs no fresh purchase or pause. The optional race is not needed to complete the walkthrough.
 
 ## Production and checks
 
-1920×1080, 30fps H264/AAC with authorized Zoe QUICK narration and ordinary synchronized [subtitles](evidence/demo.srt). The original motion timing is preserved. Only visually unchanged waits were shortened, and every complete voice take is retained. Agent-panel and mobile scrolling use smaller genuine wheel movements with reading pauses. There are no explanatory slides, simulated scrolling, screenshot pans or invented successful operations. The real app occupies nearly the full frame. The source capture used the same production HTML/JS/CSS files on a local QA port, with the same public RPC configuration.
+1920×1080,30fps H264/AAC, edited picture and narration played together at1.2× with pitch preserved. Authorized Zoe QUICK narration and ordinary synchronized [subtitles](evidence/demo.srt). The original motion timing is preserved. Only visually unchanged waits were shortened, and every complete voice take is retained. Agent-panel and mobile scrolling use smaller genuine wheel movements with reading pauses. There are no explanatory slides, simulated scrolling, screenshot pans or invented successful operations. The real app occupies nearly the full frame. The source capture used the same production HTML/JS/CSS files on a local QA port, with the same public RPC configuration.
 
 The actual encoded MP4 was checked at 15 timestamps, fully decoded, and compared with the final narration using automated speech recognition. Audio levels were measured. Source screenshot sampling is about10–15fps; repeated frames form the30fps export. This is not native30fps screen recording; no synthetic scrolling or optical-flow interpolation is used. No independent human listening review is claimed. The [production manifest](evidence/production-manifest-2026-11-14.json) records exact media hashes and verification scope.
 

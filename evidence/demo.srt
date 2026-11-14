@@ -1,107 +1,99 @@
 1
-00:00:00,250 --> 00:00:03,230
+00:00:00,042 --> 00:00:03,008
 AI agents need to pay for data and tools.
 
 2
-00:00:03,750 --> 00:00:06,070
+00:00:03,358 --> 00:00:05,271
 But with a separate wallet for every agent,
 
 3
-00:00:06,350 --> 00:00:08,291
+00:00:05,292 --> 00:00:07,671
 who keeps the whole team on budget?
 
 4
-00:00:08,550 --> 00:00:11,930
+00:00:07,917 --> 00:00:10,733
 I built Orbit to give them one shared treasury on NEAR,
 
 5
-00:00:12,210 --> 00:00:14,779
+00:00:10,967 --> 00:00:13,108
 with spending limits enforced by the contract.
 
 6
-00:00:15,300 --> 00:00:16,100
+00:00:13,333 --> 00:00:14,000
 Let me show you.
 
 7
-00:00:16,680 --> 00:00:19,700
+00:00:14,483 --> 00:00:17,000
 Here are our available funds and today’s allowance.
 
 8
-00:00:20,180 --> 00:00:23,015
+00:00:17,400 --> 00:00:19,762
 I’ll scroll down to the agents sharing that budget.
 
 9
-00:00:24,800 --> 00:00:26,380
+00:00:20,667 --> 00:00:21,983
 I’ll open research-scout.
 
 10
-00:00:26,800 --> 00:00:28,780
+00:00:22,333 --> 00:00:23,983
 Its key can only request payments,
 
 11
-00:00:29,160 --> 00:00:31,295
+00:00:24,300 --> 00:00:26,079
 with limits for each payment, the agent,
 
 12
-00:00:31,320 --> 00:00:33,166
+00:00:26,100 --> 00:00:27,638
 and the shared workspace.
 
 13
-00:00:35,400 --> 00:00:37,060
-Let’s open the paid account check.
+00:00:29,500 --> 00:00:31,167
+Let’s open this paid account check.
 
 14
-00:00:37,300 --> 00:00:41,635
+00:00:31,400 --> 00:00:34,946
 Research-scout paid one cent in test tokens to check which keys
 
 15
-00:00:41,660 --> 00:00:43,795
+00:00:34,967 --> 00:00:36,750
 could control near dot testnet.
 
 16
-00:00:43,820 --> 00:00:47,000
-The result: four keys had full control of that account.
+00:00:37,033 --> 00:00:39,217
+The report found four keys with full control,
 
 17
-00:00:47,440 --> 00:00:49,540
-Each works like an administrator credential.
+00:00:39,467 --> 00:00:41,633
+like administrator credentials for that account.
 
 18
-00:00:50,180 --> 00:00:52,160
-The owner should confirm who holds them.
+00:00:41,917 --> 00:00:44,095
+Its owner should confirm who holds them.
 
 19
-00:00:52,740 --> 00:00:55,615
-We rebuilt this report from blockchain records from that time
-
-20
-00:00:55,640 --> 00:00:58,361
-because the original response wasn’t saved.
-
-21
-00:00:59,500 --> 00:01:02,060
+00:00:45,417 --> 00:00:47,550
 Now let’s look at a separate recorded request.
 
-22
-00:01:02,640 --> 00:01:04,820
+20
+00:00:48,033 --> 00:00:49,850
 It hit the operations workspace cap.
 
-23
-00:01:05,120 --> 00:01:08,060
+21
+00:00:50,100 --> 00:00:52,550
 Open it, and we can see why it was rejected.
 
-24
-00:01:08,620 --> 00:01:09,955
+22
+00:00:53,017 --> 00:00:54,129
 No tokens went out.
 
+23
+00:00:55,417 --> 00:00:58,567
+We built Orbit, a shared treasury for AI agent teams.
+
+24
+00:00:58,867 --> 00:01:01,529
+Agents can buy the tools they need while spending stays within
+
 25
-00:01:11,500 --> 00:01:14,800
-That’s Orbit: useful work and a shared spending boundary,
-
-26
-00:01:15,160 --> 00:01:15,920
-in one place.
-
-27
-00:01:16,420 --> 00:01:20,098
-This walkthrough uses no-value test tokens on NEAR testnet.
+00:01:01,550 --> 00:01:02,698
+the team’s limits.
