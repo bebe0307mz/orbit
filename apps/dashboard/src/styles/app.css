@@ -80,7 +80,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
   .topbar .tabs { order: 10; flex-basis: calc(100% + 2 * var(--gutter)); height: 40px; margin: 0 calc(-1 * var(--gutter)); padding: 0 var(--gutter); border-top: 1px solid var(--line); }
   .tabs .fresh { display: inline-flex; margin-left: auto; }
 }
-@media (max-width: 420px) { .topbar .net .tt, .topbar .tag.sample .sd { display: none; } .topbar:has(.tag.sample) .org { display: none; } }
+@media (max-width: 420px) { .topbar .tag.sample .sd { display: none; } .topbar .badges { flex-direction: column; justify-content: center; align-items: flex-start; gap: 3px; } .topbar:has(.tag.sample) .org { display: none; } }
 
 /* ---------- Page layout ---------- */
 .page { max-width: var(--max); padding: var(--s6) var(--gutter) var(--s14); }
@@ -336,7 +336,7 @@ tr.detail td { height: auto; white-space: normal; padding: 0 var(--s3) var(--s3)
   .ac table.t td { height: auto; padding: 0; border: 0; background: none !important; }
   .ac table.t td.c-agent { grid-area: g; font-weight: 500; }
   .ac table.t td.c-amt { grid-area: a; }
-  .ac table.t td.c-st { grid-area: s; font-size: 12px; display: flex; gap: 6px; min-width: 0; overflow: hidden; }
+  .ac table.t td.c-st { grid-area: s; font-size: 12px; display: flex; flex-wrap: wrap; gap: 4px 6px; min-width: 0; overflow: hidden; }
   .ac table.t td.c-time, .ac table.t td.c-merch, .ac table.t td.col-reason { display: none; }
   .ac table.t td.c-st .t2 { display: inline; color: var(--muted); }
   .st .rs { display: inline; }
@@ -697,3 +697,65 @@ table.t tfoot td { background: color-mix(in srgb, var(--bg-subtle) 88%, var(--ac
   .race-recorded { font-size: 7px; }
 }
 @media (prefers-reduced-motion: reduce) { .race-payment { transition: none; } }
+
+
+/* A purchased resource is a transaction detail, independent of presentation scripts. */
+.purchased-task { margin-top: 18px; padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg-subtle); }
+.purchased-task-head { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; }
+.purchased-task-head p { font-size:12px; color:var(--muted); margin:6px 0 0; }
+.work-report { scroll-margin-top: 92px; margin-top:18px; padding:20px; border:1px solid var(--line); border-radius:12px; background:var(--bg-subtle); }
+.report-head { display:flex; justify-content:space-between; gap:16px; flex-wrap:wrap; }
+.report-head h2 { font-size:25px; line-height:1.2; margin:9px 0 0; }
+.report-source { font-size:12px; color:var(--muted); }
+.report-result { display:flex; gap:24px; margin:24px 0; align-items:center; }
+.report-result > strong { font-size:64px; line-height:1; color:var(--accent); letter-spacing:-.04em; }
+.report-result h3 { font-size:21px; line-height:1.25; margin:0 0 8px; }
+.report-result p { color:var(--ink-2); font-size:13px; line-height:1.5; max-width:66ch; margin:0; }
+.report-facts, .report-actions { display:flex; gap:12px 24px; flex-wrap:wrap; margin-top:18px; }
+.report-facts { font-size:12px; color:var(--muted); border-block:1px solid var(--line); padding:14px 0; }
+.report-facts b { color:var(--ink); font-weight:600; }
+.report-disclosure { color:var(--muted); font-size:12px; line-height:1.5; margin-top:20px; max-width:100ch; }
+.report-disclosure summary, .supporting-proof > summary { cursor:pointer; color:var(--ink-2); }
+.supporting-proof { border-top:1px solid var(--line); padding:18px 0; margin-top:28px; }
+.supporting-proof > summary { font-size:13px; }
+.supporting-proof .spend-story { margin-top:16px; }
+.supporting-proof h2 { font-size:32px; line-height:1.15; letter-spacing:-.035em; }
+@media(max-width:767px) {
+ .work-report { padding:14px; }
+ .report-result { gap:14px; align-items:flex-start; }
+ .report-result > strong { font-size:48px; }
+ .report-result h3 { font-size:18px; }
+ .purchased-task { padding:12px; }
+}
+.agent-view-switch { display:flex; gap:6px; margin-left:auto; }
+.agent-view-switch [aria-pressed="true"] { background:var(--accent-bg); border-color:var(--accent); color:var(--accent); }
+.workspace-monitor-head { display:flex; gap:10px 20px; align-items:center; flex-wrap:wrap; padding:14px 0; border-top:1px solid var(--line); font-size:12px; color:var(--muted); }
+.workspace-monitor-head strong { color:var(--ink); }
+.agent-desks { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; }
+.agent-desk { border:1px solid var(--line); border-radius:16px; padding:18px; background:var(--bg-subtle); }
+.desk-state { display:flex; justify-content:space-between; align-items:center; gap:12px; }
+.desk-state span { font-size:12px; color:var(--muted); }
+.desk-character { border:0; border-radius:12px; width:100%; padding:0 0 8px; margin:12px 0; background:var(--accent-bg); cursor:pointer; color:var(--accent); }
+.desk-character svg { display:block; width:100%; height:142px; }
+.desk-character > span { font-size:12px; }
+.desk-surface { fill:var(--muted); opacity:.5; }
+.desk-screen { fill:var(--bg-subtle); stroke:var(--accent); stroke-width:2; }
+.desk-lines { stroke:var(--accent); stroke-width:3; stroke-linecap:round; opacity:.65; }
+.desk-face { fill:var(--bg-subtle); stroke:var(--accent); stroke-width:2; }
+.desk-body { fill:var(--accent); }
+.desk-eye { fill:var(--ink); }
+.desk-smile, .desk-glasses, .desk-antenna, .desk-arm { fill:none; stroke:var(--ink); stroke-width:2; stroke-linecap:round; }
+.agent-desk.blocked .desk-screen { stroke:var(--danger); }
+.agent-desk.blocked .desk-lines { stroke:var(--danger); }
+.agent-desk.paid .desk-screen { stroke:var(--ok); }
+.agent-desk.paid .desk-lines { stroke:var(--ok); }
+.agent-desk.paused .desk-character { filter:grayscale(1); opacity:.7; }
+.desk-authority, .desk-latest { display:flex; flex-direction:column; gap:6px; font-size:12px; line-height:1.5; }
+.desk-authority { color:var(--ink-2); }
+.desk-latest { border-top:1px solid var(--line); padding-top:12px; margin:12px 0; }
+.desk-latest span, .desk-note { color:var(--muted); font-size:11px; }
+.agent-desk > a { font-size:12px; }
+.agent-desk.requesting .desk-lines { animation:request-glow 1s ease-in-out infinite alternate; }
+@keyframes request-glow { to { opacity:.25; } }
+@media(prefers-reduced-motion:reduce) { .agent-desk.requesting .desk-lines { animation:none; } }
+@media(max-width:767px) { .agent-desks { grid-template-columns:1fr; } .agent-view-switch { margin-left:0; } }

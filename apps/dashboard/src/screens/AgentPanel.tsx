@@ -106,6 +106,7 @@ export function AgentPanel({ id, onClose, onPause }: { id: number; onClose: () =
             <dd className="num" data-check={`agent.${a.id}.daily`}><span className="num" {...padTo(fmtUsd(a.daily_limit), kvDec)}>{fmtUsd(a.daily_limit)}</span></dd>
             <dt>Per payment</dt>
             <dd className="num" data-check={`agent.${a.id}.per`}><span className="num" {...padTo(fmtUsd(a.per_payment_limit), kvDec)}>{fmtUsd(a.per_payment_limit)}</span></dd>
+            {workspace ? <><dt>Workspace</dt><dd>{workspace.name} · {fmtUsd(workspace.remaining_today)} remaining of {fmtUsd(workspace.daily_limit)} daily</dd></> : null}
             <dt>Org daily limit</dt>
             <dd className="num"><span className="from" data-check="org.left">{fmtUsd(orgLeft)} left</span><span className="num" data-check="org.limit" {...padTo(fmtUsd(s.org.daily_limit), kvDec)}>{fmtUsd(s.org.daily_limit)}</span></dd>
             <dt>Vault available</dt>

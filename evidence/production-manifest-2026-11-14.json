@@ -1,0 +1,79 @@
+{
+  "schema": 1,
+  "date": "2026-11-14",
+  "sourceBaseCommit": "d18283c1cdc4662e8487abeb596522e59c55ea6a",
+  "sourceFilesSha256": "e52ce0be8af3a4e19a43d66f68a36e59a86eb063baf80ac64aef03dc8cc91b0e",
+  "video": {
+    "path": "evidence/demo.mp4",
+    "sha256": "746e4fdace5cdf3b52f676d337de4a38026d4a09357a4dbcf5b6635e35bfc05f",
+    "seconds": "60.300000",
+    "width": 1920,
+    "height": 1080,
+    "fps": 30,
+    "narration": "Authorized Zoe QUICK model; private voice ID and raw samples excluded"
+  },
+  "subtitles": {
+    "path": "evidence/demo.srt",
+    "sha256": "6839c0c00d0f5f6e0da98e7d662eadba6fee777cbaab15aa16621526679224f9"
+  },
+  "checks": {
+    "typescriptPassed": 240,
+    "externalTransactionTestsSkipped": 3,
+    "dashboardPassed": 42,
+    "merchantPassed": 23,
+    "buildFailureRegressions": 3,
+    "contrastPairs": 60,
+    "savedRustUnitRunPassed": 27,
+    "savedReceiptLinksVerified": 23,
+    "workspaceBurstPaid": 15,
+    "workspaceBurstRejected": 5,
+    "paidReportArchiveChecks": 5
+  },
+  "scope": [
+    "No new payment or guardian pause was sent.",
+    "Paid diagnostic and shared-cap burst are separate recorded cases.",
+    "Original HTTP response body was not preserved; report is reconstructed at its recorded data block.",
+    "Free live account refresh is not a new paid task.",
+    "No marketplace assignment, real-value token or mainnet security certification is claimed.",
+    "This local revision has not been pushed or submitted."
+  ],
+  "localContractBuild": {
+    "mode": "cargo-near non-reproducible-wasm",
+    "rust": "rustc 1.86.0 (05f9846f8 2025-03-31)",
+    "cargoNear": "cargo-near-near 0.22.0",
+    "command": "scripts/build-contracts.sh",
+    "artifacts": [
+      {
+        "path": "target/near/mock_ft/mock_ft.wasm",
+        "sha256": "2ab03be8ad7173cb6947cd9a2f525cebcf324a8570119ce33f0dd6282154591c",
+        "nearCodeHash": "3sdzASjQL1Rh45J6QdxryoE3zRv1RtUmV36e18TpNJ7d",
+        "bytes": 176230
+      },
+      {
+        "path": "target/near/orbit_vault/orbit_vault.wasm",
+        "sha256": "2b729aaf576025add7c8fb8a12a86b1e4b62c2dc8dbec41a4460d7e1f381adb1",
+        "nearCodeHash": "3vbtUo6vh8ojXtNYFc8X4aW5YFJSD2d6derDdhhxmy7e",
+        "bytes": 297363
+      },
+      {
+        "path": "target/near/orbit_vault/orbit_vault_mainnet.wasm",
+        "sha256": "e6ae86ee1003c9efe8214167fe6b3c0b878698aad8515ae9b6d65d423b1b829c",
+        "nearCodeHash": "GXV899MPTwgT9XqHL67YWAsXuDz6HGjAw5wXpMnbswGF",
+        "bytes": 297559
+      },
+      {
+        "path": "target/near/orbit_vault/orbit_vault_migrate_panic.wasm",
+        "sha256": "c86f713302bb320feac744701dc7b3418d51af764df0ab073d5695ea2057e3ad",
+        "nearCodeHash": "EVR6n1HDyoP7GjNm4La4u9ZMTtcYoVzCJo2xWhqGFQkL",
+        "bytes": 297036
+      }
+    ],
+    "deployedTestnetMatch": {
+      "vault": "orbit-ws-11a7-vault.testnet",
+      "finalBlock": 277661489,
+      "codeHash": "3vbtUo6vh8ojXtNYFc8X4aW5YFJSD2d6derDdhhxmy7e",
+      "matchesCurrentLocalVaultBuild": true
+    },
+    "scope": "Local compile and fresh public testnet hash match. This is not a reproducible container build, mainnet release qualification or deployment."
+  }
+}

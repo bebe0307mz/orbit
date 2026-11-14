@@ -1,0 +1,107 @@
+1
+00:00:00,000 --> 00:00:02,273
+Your agents need tools to finish their work.
+
+2
+00:00:02,672 --> 00:00:04,839
+Give the team a shared budget without giving every
+
+3
+00:00:04,864 --> 00:00:07,677
+agent unrestricted access to company funds.
+
+4
+00:00:07,872 --> 00:00:11,403
+Here, research-scout paid one cent in no-value test tokens
+
+5
+00:00:11,428 --> 00:00:13,010
+for an account access check.
+
+6
+00:00:13,485 --> 00:00:15,414
+Open the report to see the useful result.
+
+7
+00:00:15,608 --> 00:00:17,728
+Four keys could fully control this account.
+
+8
+00:00:18,088 --> 00:00:19,593
+Confirm who holds each one.
+
+9
+00:00:19,953 --> 00:00:23,074
+This report was reconstructed from the saved delivery block;
+
+10
+00:00:23,395 --> 00:00:25,151
+the original response wasn’t preserved.
+
+11
+00:00:25,345 --> 00:00:27,368
+Refresh current data without paying again,
+
+12
+00:00:27,613 --> 00:00:28,715
+then download the report.
+
+13
+00:00:29,171 --> 00:00:30,561
+This is a live public read,
+
+14
+00:00:30,786 --> 00:00:32,388
+separate from the recorded purchase.
+
+15
+00:00:32,582 --> 00:00:34,028
+In a separate recorded run,
+
+16
+00:00:34,158 --> 00:00:37,471
+another agent’s request hit the shared workspace cap.
+
+17
+00:00:37,735 --> 00:00:40,267
+The owner gets useful work while the budget stops
+
+18
+00:00:40,292 --> 00:00:41,182
+further spending.
+
+19
+00:00:41,377 --> 00:00:44,716
+The supporting twenty-request test settled fifteen payments
+
+20
+00:00:44,741 --> 00:00:45,842
+and blocked five.
+
+21
+00:00:46,318 --> 00:00:48,285
+NEAR enforces one shared limit,
+
+22
+00:00:48,529 --> 00:00:50,323
+using pay-only agent keys.
+
+23
+00:00:50,518 --> 00:00:53,299
+Orbit is a testnet prototype for teams buying services
+
+24
+00:00:53,324 --> 00:00:54,156
+with NEAR.
+
+25
+00:00:54,689 --> 00:00:55,791
+Today, review the work,
+
+26
+00:00:55,901 --> 00:00:57,579
+its cost, and the budget protection.
+
+27
+00:00:58,112 --> 00:01:00,079
+Real merchant adoption is still needed.

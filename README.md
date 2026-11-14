@@ -1,5 +1,15 @@
 # Orbit
 
+Orbit is a shared on-chain spending firewall for agent teams: let agents pay for tools while a NEAR vault enforces the team's budget.
+
+- **Problem:** separate agents can race for the same budget, and unrestricted wallet keys expose the treasury.
+- **Solution:** pay-only agent keys, per-agent and shared workspace limits, receipt-backed payment history, and a separate pause-only guardian.
+- **Value:** automate permitted purchases, inspect the work bought, and investigate blocked requests with exact public receipts.
+
+**Try it:** [local read-only dashboard](http://127.0.0.1:5185) after following [DEMO.md](DEMO.md). No public hosted dashboard has been published for this revision. [Final local video](evidence/demo.mp4) · [architecture](ARCHITECTURE.md) · [evidence](evidence/README.md). The recorded build and video remain local until an approved push.
+
+**Hackathon tracks:** AI Security & Defense (`security`) and Agent Economy (`agents`). Intended presenter and project owner: Zoe (`bebe0307mz`), as confirmed by the user. Authorized Zoe QUICK narration is used in the video. Development authorship is preserved in git history (`git shortlog -sn`); Codex assisted implementation, verification and production. Final submitting team membership must reflect the actual contributors.
+
 The team is also building [PrizeKey](https://github.com/bebe0307mz/prizekey) for a separate submission. PrizeKey is a native Bitcoin gift claim using NEAR Chain Signatures; it has its own contract, app, and repository. Orbit's agent spending vault and merchant flow do not depend on it.
 
 Orbit gives a business running several autonomous agents one shared spending budget. Each agent can buy an allowlisted resource using its own NEAR key, but the vault contract holds the money and enforces the company-wide cap even when agents pay at the same time. The intended use is a seller fleet that earns through NEAR Agent Market and buys data or compute to finish jobs; a live marketplace job has not yet been completed. The contract holds one pinned NEP-141 token; the current testnet deployment uses open-mint `otusd`, not Circle USDC. Each agent's function-call key can call exactly one method, `pay`. The version 1.1 contract adds owner-created workspaces with daily caps shared by their agents, alongside per-payment, per-agent and organization caps. Agent membership in a workspace is fixed when the key is registered. Replay protection and a separate pause-only guardian key complete the spending controls. The dashboard reads vault state.
@@ -11,11 +21,11 @@ The original version 1.0 testnet vault remains available as earlier evidence. A 
 The [evidence index](evidence/README.md) records what has been observed, what was only tested with fixtures, and the remaining verification gates.
 The [architecture and security boundary](ARCHITECTURE.md) shows the payment path and each key's authority.
 
-Watch the [30-second actual-app walkthrough](evidence/demo.mp4), or follow [DEMO.md](DEMO.md). The bright replay shows the 20 recorded testnet outcomes; it does not send new payments.
+Watch the [60-second product demonstration](evidence/demo.mp4), or follow [DEMO.md](DEMO.md). The product opens into treasury controls. Purchased work is attached to its payment detail; the recorded 20-outcome stress test is optional supporting evidence. No new payment is sent by replay.
 
 ## Hackathon development window
 
-The repository began on 20 October 2026, after the 19 October announcement but before the 1 November event start. Commit `c034e60` (21 October) is the last committed baseline before the November submission work. The working changes accumulated after that commit include the Agent Market seller workflow, paid NEAR account diagnostic, shared-cap concurrency proof, testnet receipt verification, dashboard polish, and this demo guide. Compare `c034e60` with the submission commit to inspect that work. Some testnet evidence was recorded on 30 October; its date is shown in the evidence files. Earlier code and the four scripted demo agents are part of the baseline and are disclosed here rather than presented as newly built after 1 November.
+The repository began on 20 October 2026, within the development window permitted from 19 October by official FAQ Q001. Commit `c034e60` (21 October) provides a useful baseline for the November changes: the Agent Market seller workflow, paid NEAR account diagnostic, shared-cap concurrency proof, testnet receipt verification, dashboard polish, and this demo guide. The [October-to-current comparison](https://github.com/bebe0307mz/orbit/compare/c034e60...main) exposes those additions after the reviewed local revision is published; until then, use `git diff c034e60 HEAD` locally. No commit dates or author identities have been rewritten. Some testnet evidence was recorded on 30 October; its date is shown in the evidence files. The earlier code and four scripted demo agents are disclosed as October work.
 
 **See the security property in one run:** four independently keyed agents submit 20 concurrent $0.05 payments against one $0.25 organization budget. The sandbox checks that exactly five settle, fifteen are rejected, the merchant receives $0.25 in test-token units, and the vault's final books balance. Run `ORBIT_ONLY=T-14b cargo test -p orbit-sandbox-tests --test sandbox -- --nocapture` after installing the prerequisites below. The demo agents are rule-driven; the quote feed is synthetic. The paid budget brief is computed from actual vault state.
 
@@ -43,7 +53,7 @@ An agent that pays for APIs needs spending authority. Giving it a wallet key mea
 
 Orbit puts every limit inside one NEAR contract. Each payment is checked and reserved in a single receipt, so the limits hold under any concurrency. On testnet, 20 simultaneous $0.05 payments from one agent against a $0.25 daily limit gave 5 paid and 15 rejected. The checked-in sandbox scenario `T-14b` tests the stronger fleet claim: 20 simultaneous payments from four agents against one $0.25 organization limit give 5 paid and 15 `over_org_daily_limit` rejections, with the merchant's token balance and final vault accounting checked.
 
-In version 1.1, owner-created workspaces partition that shared budget. A unit test reserves 20 payments from four agents assigned across two workspaces. The research workspace admits two payments under its $0.10 cap, operations admits three, and the $0.25 organization cap stops the rest. A failed token transfer restores the agent, workspace and organization reservations. Separately, a **live testnet** run from two agents in the operations workspace settled 15 of 20 concurrent $0.10 payments against its $1.50 cap and rejected five. Run `node scripts/verify-workspace-burst.mjs` to independently recheck all 20 final transactions and events.
+In version 1.1, owner-created workspaces partition that shared budget. A unit test reserves 20 payments from four agents assigned across two workspaces. The research workspace admits two payments under its $0.10 cap, operations admits three, and the $0.25 organization cap stops the rest. A failed token transfer restores the agent, workspace and organization reservations. Separately, a **live testnet** run from two agents in the operations workspace settled 15 of a 20-payment $0.10 burst against its $1.50 cap and rejected five. Run `node scripts/verify-workspace-burst.mjs` to independently recheck all 20 final transactions and events. The saved results verify shared-cap enforcement across two keys; the verifier does not establish overlapping submission timing.
 
 ## NEAR features used
 
@@ -67,10 +77,6 @@ demo/agents: four scripted agents on the SDK;  demo/attack: rejection, replay an
 ```
 
 Policy checks, in order: duplicate payment id, deadline, org paused, agent paused, merchant allowlist, per-payment limit, agent daily limit, org daily limit, vault balance. A rejection does not panic: it is written to a 256-entry outcome ring with a reason code and returned to the agent, so the dashboard can show it.
-
-## Orbit and OutLayer
-
-OutLayer (a hackathon partner) offers TEE-held, multi-chain agent wallets with a rich policy engine, multisig and mainnet maturity. Its documentation describes cumulative caps as best-effort under concurrency. Orbit is a narrower budget layer that can sit beside such a wallet: limits are exact because they are contract state checked and reserved in one receipt, one treasury serves many agents under an org-wide cap, the pause key is separate from the owner, and merchants verify payments from contract state. Orbit does not do multi-chain, swaps or multisig, and an Orbit agent key is a real secret on the agent's host, bounded only by its limits.
 
 ## Repository
 
@@ -106,7 +112,8 @@ See: `Binary: .../target/near/mock_ft/mock_ft.wasm` and `Binary: .../target/near
 ### 2. Run the tests
 
 ```bash
-cargo test -p orbit-vault --lib            # see: test result: ok. 25 passed
+cargo test -p orbit-vault --lib            # latest saved run: 27 passed
+node --test scripts/test-build-contracts.mjs # build failure / stale-output regression checks
 cargo test -p orbit-sandbox-tests --test sandbox -- --nocapture   # includes T-14b; verify the final verdict on your run
 ORBIT_ONLY=T-14b cargo test -p orbit-sandbox-tests --test sandbox -- --nocapture # exact four-agent shared-cap proof
 pnpm test                                  # TypeScript suites (SDK, merchant, CLI, API, dashboard)
@@ -231,7 +238,9 @@ See: every agent with limits and spending, and `OK` on C1 (deposited equals avai
 
 ## Prepared mainnet build
 
-The mainnet variant built from contract commit `183b59c` has SHA-256 `46d1350057c950f40672264f997d96cbc80716cd429f27e1c4ea691a6f75bc0c` and NEAR code hash `5mSZdcMm8LSnnh3FEMpPkXbL4H8scveqYAsCbbRno8RZ`. The sandbox mainnet guard passed for this build. It has not been deployed; verify both hashes again before any mainnet transaction. The remaining account, funding and signature steps are in `contracts/vault/NOTES.md`.
+The source includes a mainnet feature variant that pins Circle USDC and caps the float at 20 USDC. It has not been deployed. `scripts/build-contracts.sh` produces local artifacts with cargo-near's `non-reproducible-wasm` mode; it fails on compiler errors or missing outputs and removes incomplete artifact sets. It does not establish a reproducible release or a source-to-deployment hash match. Earlier artifact hashes are intentionally not presented as hashes for the current source.
+
+Before any mainnet release, produce and independently verify a reproducible build and provenance manifest for the exact reviewed source commit, including build command, pinned toolchain/container digest, feature set, SHA-256 and NEAR code hash. Publication and any mainnet transaction require separate approval. The remaining account, funding and signature steps are in `contracts/vault/NOTES.md`.
 
 ## Security model in brief
 
@@ -243,3 +252,5 @@ The mainnet variant built from contract commit `183b59c` has SHA-256 `46d1350057
 - Known limits: a 24 hour window that spans UTC midnight can see up to two days of one agent's limit; a settle callback that fails leaves the payment reserved until an `upgrade` repairs it. Details: `contracts/vault/NOTES.md`.
 
 Presentation uses **GSAP 3.15.1** for brief transform/opacity animation, with reduced-motion support, under its [standard license](https://gsap.com/standard-license/). It does not determine chain state or payment outcomes.
+
+The optional **Workspace** view is an agent monitor, with current key/pause/pending state and dated last outcomes. It never labels an idle agent as running a live autonomous job. The paid account report in Activity is reconstructed at its recorded delivery block; free live refresh and export are separate actions. See [DEMO.md](DEMO.md) for exact tasks and provenance.

@@ -1,0 +1,41 @@
+{
+  "network": "testnet",
+  "paid_delivery": {
+    "date": "11 November 2026",
+    "agent": "research-scout",
+    "workspace": "research",
+    "vault": "orbit-ws-11a7-vault.testnet",
+    "merchant": "orbit-ws-11a7-merchant.testnet",
+    "amount_base_units": "10000",
+    "payment_id": "9593fc34dc080b8e378d73f0a665d5c9fa6ec224e6b007374c003054acebc20e",
+    "tx_hash": "FSaoxkDUWe1naQjCvkJAdhiELbPfsKokM8vNiMJRhuF4",
+    "http_status": 200,
+    "evidence": "evidence/testnet-fresh-audit-2026-11-11.json"
+  },
+  "report_provenance": {
+    "kind": "reconstructed_recorded_block",
+    "original_http_body_preserved": false,
+    "source": "Public archival NEAR RPC queried at block 277189529, the delivery block recorded in the paid-purchase evidence. Reconstructed 14 November 2026; not a replay of the original HTTP response.",
+    "operator_run": true,
+    "underlying_data_public": true
+  },
+  "report": {
+    "kind": "near_account_diagnostic",
+    "account": "near.testnet",
+    "account_block": 277189529,
+    "keys_block": 277189529,
+    "block_hash": "B1gHKqdcMPTqj5iKfAVDdcCTLGuMH7BKq5p5AfTwj9H4",
+    "balance_yocto": "670137719410132354730578863",
+    "locked_yocto": "0",
+    "storage_bytes": 428,
+    "contract_deployed": false,
+    "full_access_keys": 4,
+    "function_call_keys": [],
+    "full_access_public_keys": [
+      "ed25519:VX61KpzUoA2mMaAWTib2UCuoCXHG3osJReJumSBDWr3",
+      "ed25519:63fg2Qi9C5mT1c41eMTuGCadZJ6NQPPvBpC2AHkZaKN6",
+      "ed25519:9UdkyCZbmYECWfoZEckB48ztbTQQqPAjhgCkAuKexrgj",
+      "ed25519:BTK3w7qDtVKyjyzzpxAYLgUT1Gs47Mwegmcdag4k5bVj"
+    ]
+  }
+}

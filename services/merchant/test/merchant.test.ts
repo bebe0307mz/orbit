@@ -2,8 +2,8 @@
 // unused, and the proof is signed by the paying agent.
 import { createServer, type Server } from 'node:http';
 import { KeyPairEd25519 } from '@near-js/crypto';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { encodeProof, NearRpc, OrbitAgent } from '@orbit/agent';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { encodeProof, NearRpc, OrbitAgent, orbitFetch } from '@orbit/agent';
 import { createMerchant } from '../src/app.ts';
 import { budgetBrief } from '../src/budget.ts';
 
@@ -100,6 +100,43 @@ describe('merchant', () => {
     expect(r.status).toBe(200);
     expect(r.body).toMatchObject({ kind: 'near_account_diagnostic', account: 'example.testnet', network_data: 'live_final_rpc', account_block: 123, keys_block: 124, full_access_keys: 1, payment_id: inv.payment_id });
     expect((await fetch(base + '/v1/account-audit?account=bad!')).status).toBe(400);
+  });
+  it('delivers useful work to one key, then stops a second key at the shared-cap boundary without delivering again', async () => {
+    // Local integration: real HTTP merchant + SDK/proof handling, fixture RPC and
+    // fixed vault outcomes. Contract cap enforcement is covered by the Rust tests.
+    const path = '/v1/account-audit?account=example.testnet';
+    let transferred = 0n;
+    const firstPay = vi.spyOn(a1, 'pay').mockImplementation(async (request) => {
+      payments[request.payment_id] = paid(1);
+      transferred += BigInt(request.amount);
+      return { status: 'paid', reason: null, payment_id: request.payment_id, seq: 0, tx_hash: TX_HASH, error: null };
+    });
+    const secondPay = vi.spyOn(a2, 'pay').mockImplementation(async (request) => ({
+      status: 'rejected', reason: 'over_workspace_daily_limit', payment_id: request.payment_id,
+      seq: 1, tx_hash: null, error: null,
+    }));
+    const statuses: number[] = [];
+    let proofRequests = 0;
+    const observedFetch: typeof fetch = async (input, init) => {
+      if (new Headers(init?.headers).has('X-PAYMENT')) proofRequests++;
+      const response = await fetch(input, init); statuses.push(response.status); return response;
+    };
+    const options = { asset: 'otusd.testnet', maxAmount: '50000', merchants: [ME], originMerchants: { [base]: ME }, fetchImpl: observedFetch };
+    try {
+      const allowed = await orbitFetch(a1, base + path, {}, options);
+      expect(allowed.response.status).toBe(200);
+      expect(await allowed.response.json()).toMatchObject({ account: 'example.testnet', full_access_keys: 1, network_data: 'live_final_rpc' });
+      const sharedRemaining = 50000n - transferred;
+      expect(sharedRemaining).toBe(0n);
+      const blocked = await orbitFetch(a2, base + path, {}, options);
+      expect(blocked.payment).toMatchObject({ status: 'rejected', reason: 'over_workspace_daily_limit' });
+      expect(blocked.response.status).toBe(402);
+      expect(statuses).toEqual([402, 200, 402]);
+      expect(proofRequests).toBe(1);
+      expect(transferred).toBe(50000n);
+      expect(Object.keys(payments)).toHaveLength(1);
+      expect(a1.publicKey).not.toBe(a2.publicKey);
+    } finally { firstPay.mockRestore(); secondPay.mockRestore(); }
   });
   it('refuses a nonexistent account before issuing an invoice or charging an agent', async () => {
     const r = await fetch(base + '/v1/account-audit?account=missing.testnet');

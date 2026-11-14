@@ -38,9 +38,9 @@ export function SpendStory() {
   return (
     <section className="spend-story" ref={root} aria-labelledby="spend-story-title">
       <div className="story-copy">
-        <span className="story-eyebrow"><span className="story-spark" aria-hidden="true">✦</span> A SHARED BUDGET FOR YOUR AI TEAM</span>
-        <h1 id="spend-story-title">Let agents work.<br /><span>Keep spending<br className="desktop-break" /> in orbit.</span></h1>
-        <p>Every agent gets a pay-only key.<br />One NEAR vault keeps the whole team within budget.</p>
+        <span className="story-eyebrow"><span className="story-spark" aria-hidden="true">✦</span> RECORDED WORKSPACE-CAP TEST</span>
+        <h2 id="spend-story-title">20 requests.<br /><span>One shared cap.</span></h2>
+        <p>Saved outcomes from two agent keys in one workspace. No new payment is sent.</p>
         <div className="story-actions"><button className="btn primary race-start" id="replayBurst" type="button" onClick={play}>{played ? 'Replay the race' : 'Replay 20-payment race'}<span aria-hidden="true">↗</span></button></div>
         <span className="story-provenance">Recorded testnet run · 11 Nov 2026 · no-value test tokens</span>
       </div>
@@ -56,7 +56,7 @@ export function SpendStory() {
           ))}
         </div>
         <div className="race-result" role="status" aria-live="polite">
-          {played ? <><div className="race-totals"><span><strong>{paid}</strong> paid</span><span className="race-blocked"><strong>{blocked}</strong> blocked</span><span className="race-overspend"><strong>$0</strong> overspent</span></div><button className="race-proof-link" id="inspectBlocked" type="button" onClick={inspectBlocked}>Inspect a blocked payment <span aria-hidden="true">→</span></button></> : <div className="race-ready"><strong>2 agents. 20 requests. One limit.</strong><span>See what happened when they paid at once.</span></div>}
+          {played ? <><div className="race-totals"><span><strong>{paid}</strong> paid</span><span className="race-blocked"><strong>{blocked}</strong> blocked</span><span className="race-overspend"><strong>$0</strong> overspent</span></div><button className="race-proof-link" id="inspectBlocked" type="button" onClick={inspectBlocked}>Inspect a blocked payment <span aria-hidden="true">→</span></button></> : <div className="race-ready"><strong>2 agents. 20 requests. One limit.</strong><span>Inspect the recorded shared-cap result.</span></div>}
         </div>
         {observation ? <div className={'race-receipt ' + observation.status} id="burstReceipt" tabIndex={-1} role="region" aria-label="Recorded payment receipt">
           <div><strong>{observation.status === 'paid' ? 'Payment settled' : 'The workspace cap stopped this payment.'}</strong><span>{observation.step.split(':')[0]} · $0.10 in test-token units</span></div>

@@ -3,11 +3,12 @@
 import { readFile } from 'node:fs/promises';
 
 const evidence = JSON.parse(await readFile(new URL('../evidence/testnet-workspace-burst-2026-11-11.json', import.meta.url), 'utf8'));
-const rpcUrl = process.env.ORBIT_RPC || 'https://test.rpc.fastnear.com';
+// Historical receipts require archival RPC; ordinary public nodes may prune transaction data.
+const rpcUrl = process.env.ORBIT_RPC || 'https://archival-rpc.testnet.near.org';
 let requestId = 0;
 
 async function rpc(method, params) {
-  for (let attempt = 0; attempt < 3; attempt++) {
+  for (let attempt = 0; attempt < 6; attempt++) {
     try {
       const response = await fetch(rpcUrl, {
         method: 'POST', headers: { 'content-type': 'application/json' },
@@ -19,8 +20,8 @@ async function rpc(method, params) {
       if (body.error || !body.result) throw new Error(JSON.stringify(body.error || body));
       return body.result;
     } catch (error) {
-      if (attempt === 2) throw new Error(`RPC ${method}: ${error.message}`);
-      await new Promise((resolve) => setTimeout(resolve, 500 * (attempt + 1)));
+      if (attempt === 5) throw new Error(`RPC ${method}: ${error.message}`);
+      await new Promise((resolve) => setTimeout(resolve, Math.min(1000 * 2 ** attempt, 8000)));
     }
   }
 }
@@ -59,8 +60,8 @@ try {
   let paid = 0;
   let rejected = 0;
   let paidUnits = 0n;
-  for (let start = 0; start < evidence.txs.length; start += 4) {
-    const batch = evidence.txs.slice(start, start + 4);
+  for (let start = 0; start < evidence.txs.length; start += 1) {
+    const batch = evidence.txs.slice(start, start + 1);
     const txs = await Promise.all(batch.map((item) => rpc('tx', [item.tx, evidence.vault])));
     for (const tx of txs) {
       requireCheck(tx.final_execution_status === 'FINAL', `transaction ${tx.transaction.hash} is final`);
@@ -105,7 +106,7 @@ try {
   }), 'two distinct currently pay-only agent keys in the same workspace signed');
   requireCheck(paid === 15 && rejected === 5 && paidUnits === 1_500_000n,
     '15 payments settled, 5 hit the workspace cap, and transfers total 1.50 test tokens');
-  console.log('Scope: final public transactions and current workspace assignment; no Agent Market job or real-value asset is claimed.');
+  console.log('Scope: final public transactions and current workspace assignment; submission overlap/timing is not verified. No Agent Market job or real-value asset is claimed.');
 } catch (error) {
   console.error(error instanceof Error ? error.message : error);
   process.exitCode = 1;

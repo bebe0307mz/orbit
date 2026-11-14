@@ -38,6 +38,7 @@ function Freshness({ short }: { short?: boolean }) {
 function SessionSlot() {
   const { source, session, sessionNote, signIn, signOut } = useStore();
   const [asking, setAsking] = useState(false);
+  if (source.kind === 'rpc') return <span className="session">Read only</span>;
   const start = () => (source.needsPassword ? setAsking(true) : signIn().catch(() => undefined));
   if (session.operator) {
     return (
@@ -74,6 +75,7 @@ export function Shell({ screen }: { screen: Screen }) {
           {network === 'testnet' ? 'Testnet' : 'Mainnet'}
           {testToken ? <span className="tt">· test token</span> : null}
         </span>
+        {source.kind !== 'mock' ? <span className="tag" data-testid="source-badge">{source.kind === 'rpc' ? 'Live RPC' : 'API sync'}</span> : null}
         {source.kind === 'mock' ? (
           <span className="tag sample" data-testid="sample-badge" title="Mock source: seeded sample data, chain steps simulated">
             Sample<span className="sd">data</span>

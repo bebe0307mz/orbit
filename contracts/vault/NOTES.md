@@ -40,10 +40,11 @@ Vault `orbit-vault-fkuc.testnet`, owner `orbit-owner-fkuc.testnet`, token `orbit
 ## Mainnet readiness checklist (nothing deployed)
 
 Must be true first:
-- [x] Current build: 25 unit tests and sandbox PASS 24, FAIL 0, SKIP 1.
+- [x] Latest saved unit-test run: 27 passed. Earlier sandbox run: PASS 24, FAIL 0, SKIP 1; this is historical evidence, not a new release qualification.
 - [x] The optional `ORBIT_MIDNIGHT=1` T-12 scenario passed on this build (2026-10-22): a payment reserved 1.869 seconds before UTC midnight settled 0.934 seconds after it and counted toward the new day's limit; the next payment was rejected for exceeding that limit.
 - [x] Testnet: `orbit-demo-codex-22-vault.testnet` uses the current contract hash `HJy2AsaiWrSTPp8PU7sCRGoYqdtLHervCnpawKx3eUm`. Four autonomous agents made 15 paid purchases in a four-minute run with 47 end-to-end checks passing. `pnpm demo:attack --agent rogue-agent` and `--burst` passed; the burst recorded 5 paid and 15 rejected with no missing attempts. The older `scripts/testnet-proof.sh` run used a prior build.
-- [x] Mainnet build: `scripts/build-contracts.sh` wrote `target/near/orbit_vault/orbit_vault_mainnet.wasm` (`--features mainnet`); sandbox MAINNET-GUARD passed. It pins Circle USDC `17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1` and refuses `float_cap > 20 USDC` in `new`. Its SHA-256 and base58 code hash are in the README; verify them again before deploying.
+- [x] Mainnet source variant (`--features mainnet`) pins Circle USDC `17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1` and refuses `float_cap > 20 USDC` in `new`; an earlier sandbox MAINNET-GUARD passed. The local build script uses `non-reproducible-wasm`; no current reproducible source-to-release artifact claim is made.
+- [ ] Before release, independently reproduce the exact reviewed commit and record its command, pinned toolchain/container digest, features, SHA-256 and NEAR code hash in a provenance manifest. Historical hashes do not qualify the current source. Mainnet deployment requires explicit approval.
 - [ ] Circle USDC behavior (E4, S-2 mainnet): one tiny payment to a merchant that is not registered on USDC must settle `failed:transfer_failed` with a full refund. Do it once, right after deploy, with an extra demo agent and merchant you then remove.
 - [ ] Guardian key generated on the API VM (`pnpm api keygen`); only its public key comes to the founder machine.
 - [x] Demo copy updated: a re-broadcast returns the original outcome, it is not "refused by RPC".

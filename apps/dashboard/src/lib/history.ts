@@ -38,7 +38,7 @@ const toOutcome = (i: ActivityItem): OutcomeItem => ({
 });
 
 export function useActivityRows(f: Filters): Rows {
-  const { source, state, outcomes } = useStore();
+  const { source, state, outcomes, retry: retrySnapshot } = useStore();
   const cursor = source.history === 'cursor' && !!source.getActivity;
   const [pages, setPages] = useState(1);
   const [refresh, setRefresh] = useState(0);
@@ -117,7 +117,11 @@ export function useActivityRows(f: Filters): Rows {
   if (!cursor) {
     const r = ring ?? { pend: [], outs: [] };
     const shown = r.outs.slice(0, pages * PAGE);
-    return { pend: r.pend, outs: r.outs, shown, hasMore: r.outs.length > shown.length, total: r.outs.length, loading: false, error: null, loadOlder, retry, seenMerchants };
+    const historyMissing = !!state && (outcomes[outcomes.length - 1]?.seq ?? -1) < state.counts.next_seq - 1;
+    return { pend: r.pend, outs: r.outs, shown, hasMore: r.outs.length > shown.length,
+      total: historyMissing ? null : r.outs.length, loading: false,
+      error: historyMissing ? 'Payment history has not loaded yet. Vault totals are current.' : null,
+      loadOlder, retry: retrySnapshot, seenMerchants };
   }
   const fresh = items.key === key;
   return {

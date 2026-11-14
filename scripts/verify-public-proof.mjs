@@ -4,7 +4,8 @@ import { readFile } from 'node:fs/promises';
 
 const evidenceFile = process.argv[2] || 'evidence/testnet-audit-2026-11-10.json';
 const evidence = JSON.parse(await readFile(new URL(`../${evidenceFile}`, import.meta.url), 'utf8'));
-const rpcUrl = process.env.ORBIT_RPC || 'https://test.rpc.fastnear.com';
+// Historical receipts require archival RPC; ordinary public nodes may prune transaction data.
+const rpcUrl = process.env.ORBIT_RPC || 'https://archival-rpc.testnet.near.org';
 let rpcId = 0;
 
 async function rpc(method, params) {

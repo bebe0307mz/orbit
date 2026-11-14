@@ -8,6 +8,9 @@ import { CopyButton, Dot, isTypingTarget, maxDecimals, padTo } from '../componen
 import { useStore } from '../lib/store';
 import { hrefFor, replaceRoute, type Route } from '../lib/route';
 import { useActivityRows } from '../lib/history';
+import { PurchasedReport } from '../components/PurchasedReport';
+import task from '../data/paid-task-report.json';
+import { receiptLink } from '../lib/receipt-link';
 
 type Status = 'all' | 'paid' | 'rejected' | 'failed' | 'pending';
 const STATUSES: Status[] = ['all', 'paid', 'rejected', 'failed', 'pending'];
@@ -31,6 +34,7 @@ function Merch({ acct, s }: { acct: string; s: DashboardState }) {
 function Detail({ o, pending, s }: { o: { payment_id: string; merchant: string } & Partial<OutcomeItem>; pending: boolean; s: DashboardState }) {
   const ex = explorerBase(s.network);
   const allowed = s.merchants.some((m) => m.account === o.merchant);
+  const receipt = !pending && o.seq != null ? receiptLink(s.network, s.vault_account, o as OutcomeItem) : null;
   return (
     <tr className="detail">
       <td colSpan={6}>
@@ -55,8 +59,11 @@ function Detail({ o, pending, s }: { o: { payment_id: string; merchant: string }
               </dd>
               <dt>Transaction</dt>
               <dd>
-                {o.tx_hash ? (
-                  <a className="mono" href={`${ex}/txns/${o.tx_hash}`} target="_blank" rel="noopener noreferrer" title={o.tx_hash}>{midTrunc(o.tx_hash, 6, 6)}</a>
+                {receipt ? (
+                  <>
+                    <a className="mono" href={`${ex}/txns/${receipt.hash}`} target="_blank" rel="noopener noreferrer" title={receipt.hash}>{midTrunc(receipt.hash, 6, 6)}</a>
+                    {receipt.source === 'saved' ? <span className="muted">Saved receipt link · exact outcome match</span> : null}
+                  </>
                 ) : (
                   <span className="muted">Not indexed · open the block</span>
                 )}
@@ -70,6 +77,7 @@ function Detail({ o, pending, s }: { o: { payment_id: string; merchant: string }
             </>
           )}
         </dl>
+        {!pending && o.kind === 'paid' && s.network === 'testnet' && s.vault_account === task.paid_delivery.vault && o.payment_id === task.paid_delivery.payment_id && o.amount === task.paid_delivery.amount_base_units && o.merchant === task.paid_delivery.merchant ? <PurchasedReport /> : null}
       </td>
     </tr>
   );

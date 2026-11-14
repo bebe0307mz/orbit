@@ -1,6 +1,21 @@
-# Orbit evidence index — updated 11 November 2026
+# Orbit evidence index — updated 14 November 2026
 
 These files are reproducible observations, not a completed NEAR Hackathon submission or proof of a live Agent Market seller job. The deployed testnet vault uses an open-mint test token with no monetary value. The four demo agents follow fixed rules; the quote feed is synthetic.
+
+
+## Final product and presentation — 14 November 2026
+
+[60-second final video](demo.mp4) · [subtitles](demo.srt) · [exact actions and narration](../DEMO.md).
+
+The final export uses authorized Zoe QUICK narration, short original slides and actual product footage. It follows a useful paid-task report, a separate live refresh and cap-rejection investigation, then the supporting recorded 15-paid/5-workspace-blocked burst. The [report reconstruction](paid-task-report-2026-11-14.json) is independently checked with `node scripts/verify-paid-task-report.mjs`; its original HTTP body was not preserved. A free current-data refresh is labeled separately. The product itself opens into treasury controls; an optional agent workspace is a monitor, not a scripted presentation. The paused agent is an existing state, not a new pause. No fresh payment was sent.
+
+The dashboard's saved link index matches network, vault and all nine outcome fields. Source-indexed API hashes have priority. Unknown or altered outcomes do not borrow a saved hash. The public read-only verifier is `node scripts/verify-recorded-receipts.mjs`; it compares signed calls, final events, receipt blocks/times, token transfers and full ring entries with the saved index.
+
+- [Agent detail](operator-agent-detail.png), [rejected payment](operator-rejected-receipt.png), [public receipt](operator-public-receipt.png).
+- [390px detail check](operator-mobile-detail.png), [390px Activity check](operator-mobile-activity.png). These are actual app frames in a fixed-width iframe, not a simulated mobile source.
+- Clean dependency install with the frozen lockfile, 240 passing TypeScript tests (three external transaction tests skipped), and production dashboard build passed. Three build failure/stale-output regressions and 60 contrast pairs also passed. The saved Rust unit run has 27 passing tests.
+- The corrected build script compiled all four local WASM variants. The testnet vault artifact matches the deployed code hash at final block 277661489; hashes and tool versions are in the [production manifest](production-manifest-2026-11-14.json). This local cargo-near build is not a reproducible container build or mainnet release qualification.
+- The 20-payment verifier freshly rechecked all final transactions, current pay-only keys, 15 paid/5 cap rejections and 1.50 transferred test tokens. Submission overlap/timing and historical key permissions are not reconstructed.
 
 ## Observed runs
 
@@ -8,7 +23,7 @@ These files are reproducible observations, not a completed NEAR Hackathon submis
 |---|---|---|
 | [Version 1.1 workspace diagnostic](testnet-workspace-audit-2026-11-11.json) | A live 402 purchase from a research-workspace agent; final vault payment and token transfer on the fresh version 1.1 testnet vault. `node scripts/verify-public-proof.mjs evidence/testnet-workspace-audit-2026-11-11.json` rechecks it. | A marketplace job or a concurrent workspace-cap race. |
 | [Fresh 402 account diagnostic](testnet-fresh-audit-2026-11-11.json) | A new 11 November run received a 402 invoice, paid 0.01 open-mint test tokens through the version 1.1 vault, and received HTTP 200 with final RPC account data. `node scripts/verify-public-proof.mjs evidence/testnet-fresh-audit-2026-11-11.json` independently rechecks the final payment, signer scope, vault event, and token transfer. | Agent Market assignment, commercial paid-data value, or a real-value token. The verifier does not replay the historical HTTP response. |
-| [Live workspace burst](testnet-workspace-burst-2026-11-11.json) | Two distinct pay-only agent keys submitted 20 concurrent $0.10 payments in one workspace; 15 paid, five were rejected at the $1.50 cap. `node scripts/verify-workspace-burst.mjs` rechecks the 20 final transactions and events. | A company-wide burst on this deployment, a marketplace buyer, or production-value tokens. |
+| [Live workspace burst](testnet-workspace-burst-2026-11-11.json) | A 20-payment $0.10 burst from two distinct pay-only agent keys in one workspace; 15 paid, five were rejected at the $1.50 cap. `node scripts/verify-workspace-burst.mjs` rechecks the 20 final transactions and events. | Overlapping submission timing, a company-wide burst on this deployment, a marketplace buyer, or production-value tokens. |
 | [Version 1.1 dashboard check](testnet-dashboard-2026-11-11.json), [desktop](workspace-cap-dashboard-desktop.png), [mobile](workspace-cap-dashboard-mobile.png), [activity](workspace-cap-activity.png) | Against the live vault, RPC and API dashboards matched the workspace-aware vault state, the API activity had no gaps, and 73 UI checks passed with none failed. The images show the exhausted operations workspace, activity outcomes and two layouts. | A real Agent Market job, browser wallet signing, or a fresh payment from the screenshot alone. The pause action was not run in this check. |
 | [Guardian pause and rejected pay](testnet-guardian-pause-2026-11-11.json), [dashboard checks](testnet-guardian-dashboard-2026-11-11.json), [paused row](testnet-guardian-paused-dashboard.png) | The separate guardian key paused `rogue-agent` through the live dashboard; the agent's next $0.01 pay was rejected as `agent_paused` before the exhausted workspace cap. `node scripts/verify-guardian-pause.mjs` checks the final transactions, events, current key scopes and accounting from public RPC. The pause dashboard run passed 81 checks with none failed. | A marketplace job or production-value token. Current key scope does not prove historical key scope. |
 | [Shared-cap sandbox T-14b](sandbox-shared-cap-t14b.json) | 20 concurrent payments from four keys against one shared cap: 5 paid, 15 rejected; all receipts settled. | An external buyer, merchant, or marketplace job; this is a local NEAR sandbox run. |

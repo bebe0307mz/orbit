@@ -10,6 +10,7 @@ import { hrefFor, replaceRoute, type Route } from '../lib/route';
 import { AgentPanel } from './AgentPanel';
 import { PauseDialog } from './PauseDialog';
 import { AddAgentSheet } from './AddAgentSheet';
+import { AgentWorkspace } from '../components/AgentWorkspace';
 import { SpendStory } from '../components/SpendStory';
 
 type SortKey = 'name' | 'status' | 'spent' | 'daily' | 'per' | 'rem' | 'last';
@@ -58,8 +59,8 @@ function Figures({ s }: { s: DashboardState }) {
   return (
     <div className="figs">
       <div className="fig">
-        <div className="l">Vault balance</div>
-        <div className="v num" style={room(v.float_cap)} data-check="vault.balance">{fmtUsd(vaultBalance(v))}</div>
+        <div className="l">Available funds</div>
+        <div className="v num" style={room(v.float_cap)} data-check="vault.available">{fmtUsd(v.available)}</div>
         <div className="s">of <span data-check="vault.cap">{fmtUsd(v.float_cap)}</span> float cap</div>
       </div>
       <div className="fig">
@@ -139,6 +140,7 @@ export function AgentsScreen({ route }: { route: Route }) {
   const now = useNow(source);
   const { stale } = useStale();
   const [q, setQ] = useState('');
+  const [agentView, setAgentView] = useState<'table' | 'workspace'>('table');
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: 'spent', dir: -1 });
   const [current, setCurrent] = useState<number | null>(null);
   const [dialog, setDialog] = useState<number | 'all' | null>(null);
@@ -178,7 +180,7 @@ export function AgentsScreen({ route }: { route: Route }) {
   const closePanel = () => {
     replaceRoute('agents');
     const id = current ?? panelId;
-    requestAnimationFrame(() => document.querySelector<HTMLElement>(`tr.row[data-id="${id}"] .row-link`)?.focus());
+    requestAnimationFrame(() => (document.querySelector<HTMLElement>(`tr.row[data-id="${id}"] .row-link`) ?? document.querySelector<HTMLElement>(`[data-open-agent="${id}"]`))?.focus());
   };
   const openPause = (target: number | 'all') => {
     lastFocus.current = document.activeElement as HTMLElement;
@@ -227,7 +229,7 @@ export function AgentsScreen({ route }: { route: Route }) {
         const id = ids[i]!;
         setCurrent(id);
         if (panelId != null) replaceRoute('agents', { agent: id });
-        requestAnimationFrame(() => document.querySelector<HTMLElement>(`tr.row[data-id="${id}"] .row-link`)?.focus());
+        requestAnimationFrame(() => (document.querySelector<HTMLElement>(`tr.row[data-id="${id}"] .row-link`) ?? document.querySelector<HTMLElement>(`[data-open-agent="${id}"]`))?.focus());
         e.preventDefault();
       } else if (e.key === 'Enter' && current != null && !(document.activeElement as HTMLElement)?.closest?.('.panel, button, a')) {
         openPanel(current);
@@ -245,13 +247,15 @@ export function AgentsScreen({ route }: { route: Route }) {
     <div className="page-head">
       <div className="page-heading">
         <span className="page-kicker">Fleet overview</span>
-        <h2 className="t-title">Agent spending{count != null ? <span className="count">{count} agents</span> : null}</h2>
-        <p className="page-description">Your vault, budgets and agents.</p>
+        <h1 className="t-title">Agent treasury{count != null ? <span className="count">{count} agents</span> : null}</h1>
+        <p className="page-description">Available funds, spending authority and shared limits.</p>
       </div>
       <div className="actions">
+        <a className="btn secondary sm" href={hrefFor('activity')}>Transactions</a>
+        {source.kind === 'rpc' ? <button className="btn secondary sm" disabled title="Connect the authenticated guardian API to pause. This view holds no signing key.">Emergency pause · read only</button> : null}
         {operator && s && s.agents.length > 0 && !s.org.paused ? (
           <button className="btn secondary sm" type="button" id="pauseAll" disabled={busy(ops.all)} onClick={() => openPause('all')}>
-            Pause all
+            Emergency pause
           </button>
         ) : null}
         <button className="btn primary sm" type="button" id="addAgent" disabled={!s} onClick={() => { lastFocus.current = document.activeElement as HTMLElement; setAdding(true); }}>
@@ -322,7 +326,8 @@ export function AgentsScreen({ route }: { route: Route }) {
           <div className="operational-strip" aria-label="Fleet activity summary">
             <span><strong>{s.agents.filter((a) => a.status === 'active').length}</strong> active agents</span>
             <a href={hrefFor('activity', { status: 'pending' })}><strong>{s.pending_count}</strong> in flight <span aria-hidden="true">↗</span></a>
-            <a href={hrefFor('activity', { status: 'rejected' })}><strong>{s.counts.rejected}</strong> rejected payments <span aria-hidden="true">↗</span></a>
+            <a href={hrefFor('activity', { status: 'paid' })}><strong>{s.counts.paid}</strong> paid payments</a>
+            <a href={hrefFor('activity', { status: 'rejected' })}><strong>{s.counts.rejected}</strong> blocked payments <span aria-hidden="true">↗</span></a>
           </div>
           <Banners screen="agents">
             {s.org.paused ? (
@@ -348,9 +353,9 @@ export function AgentsScreen({ route }: { route: Route }) {
                   <input ref={qRef} className="input" id="q" type="search" placeholder="Search agents" aria-label="Search agents" value={q} onChange={(e) => setQ(e.target.value)} autoComplete="off" />
                   <kbd>/</kbd>
                 </div>
-                <span className="right">Revoked agents last</span>
+                <div className="agent-view-switch" role="group" aria-label="Agent view"><button className="btn secondary sm" aria-pressed={agentView === 'table'} onClick={() => setAgentView('table')}>Table</button><button className="btn secondary sm" aria-pressed={agentView === 'workspace'} onClick={() => setAgentView('workspace')}>Workspace</button></div>
               </div>
-              <div className="table-wrap at">
+              {agentView === 'workspace' ? <AgentWorkspace agents={rows} onOpen={openPanel} /> : <div className="table-wrap at">
                 <table className="t" aria-label="Agents">
                   <thead>
                     <tr>
@@ -421,7 +426,7 @@ export function AgentsScreen({ route }: { route: Route }) {
                     </tr>
                   </tfoot>
                 </table>
-              </div>
+              </div>}
             </>
           )}
         </div>
@@ -431,7 +436,7 @@ export function AgentsScreen({ route }: { route: Route }) {
 
   return (
     <>
-      <main className="page ag" id="page"><SpendStory /><div className="dashboard-divider"><span>YOUR VAULT</span><span>Current dashboard source shown in the header</span></div>{body}</main>
+      <main className="page ag" id="page">{body}<details className="supporting-proof"><summary>Example & evidence: recorded workspace-cap test</summary><SpendStory /></details></main>
       {s && panelId != null ? (
         <AgentPanel id={panelId} onClose={closePanel} onPause={(id) => openPause(id)} />
       ) : null}
