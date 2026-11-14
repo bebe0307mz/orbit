@@ -1,12 +1,12 @@
 {
   "schema": 1,
   "date": "2026-11-14",
-  "sourceBaseCommit": "49a55406bc2c9d41c16c8b68bc60fcc04c6412fa",
+  "sourceBaseCommit": "cedd8482926a106bebbee21bf89b4563654b6671",
   "sourceFilesSha256": "e52ce0be8af3a4e19a43d66f68a36e59a86eb063baf80ac64aef03dc8cc91b0e",
   "video": {
     "path": "evidence/demo.mp4",
-    "sha256": "493e83cda49874ac573d53501638b83e816284725c4bec5b048dd879ddab2fdb",
-    "seconds": 63.333333333333336,
+    "sha256": "f1fbdaa5e8f39b71d0974d0e5bed1293c7e081218a65fbae3cd1684668b5e232",
+    "seconds": 64.16568405139834,
     "width": 1920,
     "height": 1080,
     "fps": 30,
@@ -38,7 +38,7 @@
       59
     ],
     "fullDecodePassed": true,
-    "automatedSpeechAgreement": 0.9703504043126685,
+    "automatedSpeechAgreement": 0.9757412398921833,
     "audioSpeed": 1.2,
     "sourceSampling": "Approximately10–15fps;30fps export repeats frames. No recording/screencast API was available.",
     "completeOriginalVoiceTakesPreserved": true,
@@ -46,14 +46,16 @@
     "restoredClippedWordEndingVerified": true,
     "editing": "Original scroll/click timing retained; only unchanged waiting intervals shortened. Agent-panel scrolling recaptured with23 small real wheel increments.",
     "reportExplanation": "Purchase, checked account, four full-control keys as administrator credentials, owner next step. Historical-data labels remain in the UI; no spoken reconstruction digression.",
-    "baseSeconds": 76,
+    "baseSeconds": 76.99882086167801,
     "playbackSpeed": 1.2,
-    "closing": "We built Orbit, a shared treasury for AI agent teams. Agents can buy the tools they need while spending stays within the team’s limits.",
-    "openingQuestionDelivery": "Curious delivery with a measured rising final-word pitch contour."
+    "closing": "We built Orbit, a shared treasury for AI agent teams. NEAR smart contracts enforce the shared budget, with payment-only access keys for the agents.",
+    "openingQuestionDelivery": "Curious delivery with a measured rising final-word pitch contour.",
+    "historyNarration": "Now let’s open a recorded payment request from another agent. It was rejected because the operations workspace had reached its shared spending limit. No tokens were sent.",
+    "nearExplanation": "NEAR smart contracts enforce the shared budget, with payment-only access keys for the agents."
   },
   "subtitles": {
     "path": "evidence/demo.srt",
-    "sha256": "ecc713a0029a7f55070887d25ed7a6a166c101ef074893a358eff65f1e67ae7f"
+    "sha256": "60441f9b394ed300e762244103309592978b0b61fc9468121b041c4a5fdcdf92"
   },
   "checks": {
     "typescriptPassed": 240,
@@ -132,7 +134,7 @@
   "verificationReuse": "Product source unchanged from verified local commit4e8f855; this revision replaces media and its documentation only.",
   "publicEndpoints": {
     "app": "https://orbit-agent-treasury.lunarmouse9.chatgpt.site",
-    "demo": "https://orbit-agent-treasury.lunarmouse9.chatgpt.site/demo-1p2x.mp4",
+    "demo": "https://orbit-agent-treasury.lunarmouse9.chatgpt.site/demo-near-1p2x.mp4",
     "subtitles": "https://orbit-agent-treasury.lunarmouse9.chatgpt.site/demo.srt"
   }
 }

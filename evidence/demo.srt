@@ -71,29 +71,29 @@ like administrator credentials for that account.
 Its owner should confirm who holds them.
 
 19
-00:00:45,417 --> 00:00:47,550
-Now let’s look at a separate recorded request.
+00:00:45,417 --> 00:00:48,467
+Now let’s open a recorded payment request from another agent.
 
 20
-00:00:48,033 --> 00:00:49,850
-It hit the operations workspace cap.
+00:00:48,917 --> 00:00:51,746
+It was rejected because the operations workspace had reached its
 
 21
-00:00:50,100 --> 00:00:52,550
-Open it, and we can see why it was rejected.
+00:00:51,767 --> 00:00:52,833
+shared spending limit.
 
 22
-00:00:53,017 --> 00:00:54,129
-No tokens went out.
+00:00:53,117 --> 00:00:54,284
+No tokens were sent.
 
 23
-00:00:55,417 --> 00:00:58,567
+00:00:55,417 --> 00:00:58,467
 We built Orbit, a shared treasury for AI agent teams.
 
 24
-00:00:58,867 --> 00:01:01,529
-Agents can buy the tools they need while spending stays within
+00:00:58,783 --> 00:01:00,846
+NEAR smart contracts enforce the shared budget,
 
 25
-00:01:01,550 --> 00:01:02,698
-the team’s limits.
+00:01:00,867 --> 00:01:03,549
+with payment-only access keys for the agents.
