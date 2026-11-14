@@ -1,20 +1,50 @@
 {
   "schema": 1,
   "date": "2026-11-14",
-  "sourceBaseCommit": "d18283c1cdc4662e8487abeb596522e59c55ea6a",
+  "sourceBaseCommit": "4e8f855683252cf739ec0a50fc001109f049a7d0",
   "sourceFilesSha256": "e52ce0be8af3a4e19a43d66f68a36e59a86eb063baf80ac64aef03dc8cc91b0e",
   "video": {
     "path": "evidence/demo.mp4",
-    "sha256": "746e4fdace5cdf3b52f676d337de4a38026d4a09357a4dbcf5b6635e35bfc05f",
-    "seconds": "60.300000",
+    "sha256": "0dc0cd2dcb04fee322bb170145a93eb49b2cc664ba71578c5a9c33f18506eca3",
+    "seconds": 86,
     "width": 1920,
     "height": 1080,
     "fps": 30,
-    "narration": "Authorized Zoe QUICK model; private voice ID and raw samples excluded"
+    "narration": "Authorized Zoe QUICK model; private voice ID and raw samples excluded",
+    "chosenDevice": "desktop",
+    "sourceViewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "actualAppInteractionSegments": 4,
+    "sourceFramesCaptured": 1295,
+    "slides": 0,
+    "syntheticScrolling": false,
+    "reviewedEncodedFrameSeconds": [
+      3,
+      11,
+      20,
+      26,
+      31,
+      36,
+      42,
+      47,
+      51,
+      56,
+      64,
+      68,
+      72,
+      80,
+      84
+    ],
+    "fullDecodePassed": true,
+    "automatedSpeechAgreement": 0.9595375722543352,
+    "audioSpeed": 1.0,
+    "sourceSampling": "Approximately13–15fps; repeated frames produce30fps export."
   },
   "subtitles": {
     "path": "evidence/demo.srt",
-    "sha256": "6839c0c00d0f5f6e0da98e7d662eadba6fee777cbaab15aa16621526679224f9"
+    "sha256": "fedcf4f5d09af6f8454c3efd6dc44b8341e7f126fd19c62b112c304d4faa6dbb"
   },
   "checks": {
     "typescriptPassed": 240,
@@ -75,5 +105,18 @@
       "matchesCurrentLocalVaultBuild": true
     },
     "scope": "Local compile and fresh public testnet hash match. This is not a reproducible container build, mainnet release qualification or deployment."
-  }
+  },
+  "mobileSupportingVideo": {
+    "path": "evidence/mobile-treasury-scroll.mp4",
+    "sha256": "44ff6ae06d1b3cc195b3ed7a63e3ad12071c9d50fa6b9814a8c3aafa40f46ce5",
+    "seconds": 26,
+    "width": 1080,
+    "height": 1920,
+    "responsiveViewport": {
+      "width": 390,
+      "height": 650
+    },
+    "scope": "Silent treasury scrolling, supplementary to the complete desktop walkthrough."
+  },
+  "verificationReuse": "Product source unchanged from verified local commit4e8f855; this revision replaces media and its documentation only."
 }

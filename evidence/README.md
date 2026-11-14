@@ -5,9 +5,11 @@ These files are reproducible observations, not a completed NEAR Hackathon submis
 
 ## Final product and presentation — 14 November 2026
 
-[60-second final video](demo.mp4) · [subtitles](demo.srt) · [exact actions and narration](../DEMO.md).
+[86-second natural desktop walkthrough](demo.mp4) · [subtitles](demo.srt) · [exact actions and narration](../DEMO.md) · [26-second silent mobile treasury scroll](mobile-treasury-scroll.mp4).
 
-The final export uses authorized Zoe QUICK narration, short original slides and actual product footage. It follows a useful paid-task report, a separate live refresh and cap-rejection investigation, then the supporting recorded 15-paid/5-workspace-blocked burst. The [report reconstruction](paid-task-report-2026-11-14.json) is independently checked with `node scripts/verify-paid-task-report.mjs`; its original HTTP body was not preserved. A free current-data refresh is labeled separately. The product itself opens into treasury controls; an optional agent workspace is a monitor, not a scripted presentation. The paused agent is an existing state, not a new pause. No fresh payment was sent.
+The final export uses authorized Zoe QUICK narration over real continuous app use. It starts with the shared-budget problem, scrolls through treasury controls, selects research-scout, follows its paid diagnostic into the useful report, then investigates a separate workspace-cap rejection. The report and its source disclosure are genuinely scrolled. No editorial slides, synthetic scrolling or fresh payment are used.
+
+The [paid-task report reconstruction](paid-task-report-2026-11-14.json) is independently checked with `node scripts/verify-paid-task-report.mjs`; its original HTTP body was not preserved. The report is labeled accordingly. A free live refresh remains a separate product action; this cut focuses on the recorded result. The optional agent workspace and recorded race remain available in the app without driving its information architecture. Current read-only inspection does not replay any signed transaction.
 
 The dashboard's saved link index matches network, vault and all nine outcome fields. Source-indexed API hashes have priority. Unknown or altered outcomes do not borrow a saved hash. The public read-only verifier is `node scripts/verify-recorded-receipts.mjs`; it compares signed calls, final events, receipt blocks/times, token transfers and full ring entries with the saved index.
 

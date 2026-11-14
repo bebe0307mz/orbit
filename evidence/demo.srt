@@ -1,107 +1,91 @@
 1
-00:00:00,000 --> 00:00:02,273
-Your agents need tools to finish their work.
+00:00:00,250 --> 00:00:03,230
+AI agents need to pay for data and tools.
 
 2
-00:00:02,672 --> 00:00:04,839
-Give the team a shared budget without giving every
+00:00:03,750 --> 00:00:06,070
+But with a separate wallet for every agent,
 
 3
-00:00:04,864 --> 00:00:07,677
-agent unrestricted access to company funds.
+00:00:06,350 --> 00:00:08,110
+who keeps the whole team on budget?
 
 4
-00:00:07,872 --> 00:00:11,403
-Here, research-scout paid one cent in no-value test tokens
+00:00:08,550 --> 00:00:11,930
+I built Orbit to give them one shared treasury on NEAR,
 
 5
-00:00:11,428 --> 00:00:13,010
-for an account access check.
+00:00:12,210 --> 00:00:14,390
+with spending limits enforced by the contract.
 
 6
-00:00:13,485 --> 00:00:15,414
-Open the report to see the useful result.
+00:00:15,300 --> 00:00:16,100
+Let me show you.
 
 7
-00:00:15,608 --> 00:00:17,728
-Four keys could fully control this account.
+00:00:16,680 --> 00:00:19,700
+Here are our available funds and today’s allowance.
 
 8
-00:00:18,088 --> 00:00:19,593
-Confirm who holds each one.
+00:00:20,180 --> 00:00:22,800
+I’ll scroll down to the agents sharing that budget.
 
 9
-00:00:19,953 --> 00:00:23,074
-This report was reconstructed from the saved delivery block;
+00:00:24,800 --> 00:00:26,380
+I’ll open research-scout.
 
 10
-00:00:23,395 --> 00:00:25,151
-the original response wasn’t preserved.
+00:00:26,800 --> 00:00:28,780
+Its key can only request payments,
 
 11
-00:00:25,345 --> 00:00:27,368
-Refresh current data without paying again,
+00:00:29,160 --> 00:00:31,295
+with limits for each payment, the agent,
 
 12
-00:00:27,613 --> 00:00:28,715
-then download the report.
+00:00:31,320 --> 00:00:32,740
+and the shared workspace.
 
 13
-00:00:29,171 --> 00:00:30,561
-This is a live public read,
+00:00:41,000 --> 00:00:44,840
+Follow its activity, choose Paid, and open the account check.
 
 14
-00:00:30,786 --> 00:00:32,388
-separate from the recorded purchase.
+00:00:45,220 --> 00:00:48,640
+Here’s what the payment bought: an account access report.
 
 15
-00:00:32,582 --> 00:00:34,028
-In a separate recorded run,
+00:00:49,000 --> 00:00:52,835
+It’s reconstructed at the saved delivery block; the original response
 
 16
-00:00:34,158 --> 00:00:37,471
-another agent’s request hit the shared workspace cap.
+00:00:52,860 --> 00:00:53,840
+wasn’t preserved.
 
 17
-00:00:37,735 --> 00:00:40,267
-The owner gets useful work while the budget stops
+00:01:02,800 --> 00:01:05,360
+Now let’s look at a separate recorded request.
 
 18
-00:00:40,292 --> 00:00:41,182
-further spending.
+00:01:05,940 --> 00:01:08,120
+It hit the operations workspace cap.
 
 19
-00:00:41,377 --> 00:00:44,716
-The supporting twenty-request test settled fifteen payments
+00:01:08,420 --> 00:01:11,360
+Open it, and we can see why it was rejected.
 
 20
-00:00:44,741 --> 00:00:45,842
-and blocked five.
+00:01:11,920 --> 00:01:13,040
+No tokens went out.
 
 21
-00:00:46,318 --> 00:00:48,285
-NEAR enforces one shared limit,
+00:01:17,200 --> 00:01:20,500
+That’s Orbit: useful work and a shared spending boundary,
 
 22
-00:00:48,529 --> 00:00:50,323
-using pay-only agent keys.
+00:01:20,860 --> 00:01:21,620
+in one place.
 
 23
-00:00:50,518 --> 00:00:53,299
-Orbit is a testnet prototype for teams buying services
-
-24
-00:00:53,324 --> 00:00:54,156
-with NEAR.
-
-25
-00:00:54,689 --> 00:00:55,791
-Today, review the work,
-
-26
-00:00:55,901 --> 00:00:57,579
-its cost, and the budget protection.
-
-27
-00:00:58,112 --> 00:01:00,079
-Real merchant adoption is still needed.
+00:01:22,120 --> 00:01:25,600
+This walkthrough uses no-value test tokens on NEAR testnet.

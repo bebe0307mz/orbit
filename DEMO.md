@@ -1,6 +1,6 @@
 # Orbit — treasury controls and purchased work
 
-[Watch the 60-second product demo](evidence/demo.mp4). The application opens directly into treasury controls. The video explains selected interactions; it is a separate artifact.
+[Watch the 86-second product walkthrough](evidence/demo.mp4). The application opens directly into treasury controls. The video explains selected interactions; it is a separate artifact.
 
 ## Run the product
 
@@ -40,21 +40,26 @@ node scripts/verify-guardian-pause.mjs
 
 These are read-only archival RPC checks and exit nonzero on unavailable or mismatched evidence. `ORBIT_RPC` overrides the endpoint. No new payment is needed.
 
-## Final narration and edit map
+## Natural product walkthrough
 
-| Time | Actual picture / action | Zoe QUICK narration |
+The [86-second main video](evidence/demo.mp4) keeps the real desktop app visible from the first frame. At 1280×720, the agent table, shared budgets and docked agent controls can be compared together. It follows one investigation through actual scrolling and clicks, with pauses to read the result. The [26-second silent mobile treasury scroll](evidence/mobile-treasury-scroll.mp4) is supplementary responsive footage, not a second complete task demo.
+
+| Time | Actual app interaction | Spoken explanation |
 |---|---|---|
-| 0.0–7.9s | Original short problem slide, separate from the working product. | Your agents need tools to finish their work. Give the team a shared budget without giving every agent unrestricted access to company funds. |
-| 7.9–15.6s | Transactions → Paid → expand the recorded research-scout payment #21. | Here, research-scout paid one cent in no-value test tokens for an account access check. Open the report to see the useful result. |
-| 15.6–25.3s | Open purchased account report: four full-control keys; reconstructed saved-block provenance visible. | Four keys could fully control this account. Confirm who holds each one. This report was reconstructed from the saved delivery block; the original response wasn’t preserved. |
-| 25.3–32.6s | Genuine live public account refresh; saved payment remains separate. Actual JSON download was verified. | Refresh current data without paying again, then download the report. This is a live public read, separate from the recorded purchase. |
-| 32.6–41.4s | Switch to Rejected → expand the separate recorded workspace-cap rejection #20. | In a separate recorded run, another agent’s request hit the shared workspace cap. The owner gets useful work while the budget stops further spending. |
-| 41.4–50.5s | Optional Example & evidence disclosure → recorded20-request proof;15 paid,5 blocked. No new payment. | The supporting twenty-request test settled fifteen payments and blocked five. NEAR enforces one shared limit, using pay-only agent keys. |
-| 50.5–60.3s | Optional workspace monitor: click character to inspect actual spending authority, then return. Idle is genuine; last outcomes are dated. Closing slide is original video material. | Orbit is a testnet prototype for teams buying services with NEAR. Today, review the work, its cost, and the budget protection. Real merchant adoption is still needed. |
+| 0–15s | Treasury loads from public RPC; available funds and shared budgets remain visible. | Agents need to buy data and tools. Orbit puts one shared budget on NEAR, enforced by the contract. |
+| 15–24s | Scroll the real treasury into its agent table. | Review available funds, today’s allowance and the agents sharing it. |
+| 24–38s | Select research-scout; scroll its docked detail through limits, pay-only scope and recent payments. | Its key can request payments only, within per-payment, agent and workspace limits. |
+| 38–59s | Follow the agent’s activity, choose Paid, expand recorded payment#21, open its account report, scroll the actual result and open its source disclosure. | See what the payment bought. The report is reconstructed at the saved delivery block; the original HTTP response was not preserved. |
+| 59–77s | Return to all Activity, filter Rejected, expand the separate recorded operations-workspace rejection#20 and scroll its actual reason. | The shared workspace cap rejected this distinct request; no payment tokens went out. |
+| 77–86s | Return to treasury funds and workspace limits. | Useful work and a shared spending boundary, using no-value test tokens on NEAR testnet. |
+
+The paid diagnostic and blocked operations request are separate recorded cases. This is current read-only inspection; the video performs no fresh purchase or pause. The optional race is not needed to complete the walkthrough.
 
 ## Production and checks
 
-60-second, 1920×1080, 30 fps MP4 with authorized Zoe QUICK narration and ordinary synchronized [subtitles](evidence/demo.srt). Short original problem/closing slides are video-only. Product footage uses close-up browser views; genuine network waits were trimmed. There is no redundant provenance footer.
+1920×1080, 30fps H264/AAC with authorized Zoe QUICK narration and ordinary synchronized [subtitles](evidence/demo.srt). Four continuous interaction segments retain their original capture timing; short tail pauses were trimmed between matching states. There are no explanatory slides, simulated scrolling, screenshot pans or invented successful operations. The real app occupies nearly the full frame. The source capture used the same production HTML/JS/CSS files on a local QA port, with the same public RPC configuration.
+
+The actual encoded MP4 was checked at 15 timestamps, fully decoded, and compared with the final narration using automated speech recognition. Audio levels were measured. Source screenshot sampling is about 13–15fps; repeated frames form the 30fps export. No independent human listening review is claimed. The [production manifest](evidence/production-manifest-2026-11-14.json) records exact media hashes and verification scope.
 
 A fresh source snapshot with no copied dependency directory installed the frozen lockfile from cached registry packages, passed **240 TypeScript tests** (three external transaction tests skipped), and built the dashboard. Dashboard has **42 tests**; merchant has **23 passing tests**, including the real HTTP/SDK delivery followed by a fixture cap rejection. That regression is not a new chain transaction; real shared-cap enforcement has separate Rust/sandbox evidence. Three build-script failure regressions and all 60 contrast pairs passed. The inspected saved Rust unit run passed 27 tests.
 
