@@ -10,6 +10,7 @@ import { hrefFor, replaceRoute, type Route } from '../lib/route';
 import { AgentPanel } from './AgentPanel';
 import { PauseDialog } from './PauseDialog';
 import { AddAgentSheet } from './AddAgentSheet';
+import { SpendStory } from '../components/SpendStory';
 
 type SortKey = 'name' | 'status' | 'spent' | 'daily' | 'per' | 'rem' | 'last';
 const ORDER = { active: 0, paused: 1, revoked: 2 } as const;
@@ -244,8 +245,8 @@ export function AgentsScreen({ route }: { route: Route }) {
     <div className="page-head">
       <div className="page-heading">
         <span className="page-kicker">Fleet overview</span>
-        <h1 className="t-title">Agent spending{count != null ? <span className="count">{count} agents</span> : null}</h1>
-        <p className="page-description">An on-chain spending firewall for agents buying resources while they complete jobs.</p>
+        <h2 className="t-title">Agent spending{count != null ? <span className="count">{count} agents</span> : null}</h2>
+        <p className="page-description">Your vault, budgets and agents.</p>
       </div>
       <div className="actions">
         {operator && s && s.agents.length > 0 && !s.org.paused ? (
@@ -302,7 +303,6 @@ export function AgentsScreen({ route }: { route: Route }) {
           <Figures s={s} />
           <p className="budget-explain">
             <strong>One shared daily budget protects {s.agents.filter((a) => a.status !== 'revoked').length} agent{s.agents.filter((a) => a.status !== 'revoked').length === 1 ? '' : 's'}.</strong>
-            {' '}The vault reserves each payment on chain before transferring tokens, so simultaneous requests cannot spend past the organization limit.
           </p>
           {s.workspaces?.some((w) => w.id !== 0) ? (
             <section className="workspace-section" aria-label="Workspace budgets">
@@ -431,7 +431,7 @@ export function AgentsScreen({ route }: { route: Route }) {
 
   return (
     <>
-      <main className="page ag" id="page">{body}</main>
+      <main className="page ag" id="page"><SpendStory /><div className="dashboard-divider"><span>YOUR VAULT</span><span>Current dashboard source shown in the header</span></div>{body}</main>
       {s && panelId != null ? (
         <AgentPanel id={panelId} onClose={closePanel} onPause={(id) => openPause(id)} />
       ) : null}

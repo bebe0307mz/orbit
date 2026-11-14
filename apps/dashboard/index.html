@@ -1,13 +1,13 @@
 <!doctype html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="light">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Orbit</title>
 <script>
-  // Theme before first paint: stored choice, else dark (the default). Must match src/theme.ts.
+  // Theme before first paint: stored choice, else light. Must match src/theme.ts.
   (function () {
-    var t = 'dark';
+    var t = 'light';
     try { var s = localStorage.getItem('orbit.theme'); if (s === 'light' || s === 'dark') t = s; } catch (e) {}
     document.documentElement.setAttribute('data-theme', t);
   })();

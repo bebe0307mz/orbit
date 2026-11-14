@@ -50,16 +50,16 @@
 /* theme:light */
 :root[data-theme="light"] {
   color-scheme: light;
-  --bg: #F5F7FB;
+  --bg: #FAF9FE;
   --bg-subtle: #FFFFFF;
-  --bg-hover: #EDF2F9;
-  --ink: #142033;
-  --ink-2: #35445A;
-  --muted: #59697D;
-  --line: #DBE3ED;
-  --line-strong: #BCC9D9;
-  --accent: #3156C7;
-  --accent-bg: #E8EEFF;
+  --bg-hover: #F0EDF9;
+  --ink: #211B35;
+  --ink-2: #49405C;
+  --muted: #665D77;
+  --line: #E6E0F0;
+  --line-strong: #C8BDD9;
+  --accent: #6246D9;
+  --accent-bg: #F0ECFF;
   --warn: #945400;
   --warn-dot: #B46A06;
   --warn-bg: #FFF1DB;
@@ -68,8 +68,8 @@
   --ok: #137348;
   --on-ink: #FFFFFF;
   --on-danger: #FFFFFF;
-  --bar: #3156C7;
-  --track: #DBE3ED;
+  --bar: #6246D9;
+  --track: #E6E0F0;
   --scrim: rgb(0 0 0 / .24);
   --shadow-overlay: 0 16px 48px rgb(0 0 0 / .14);
 }

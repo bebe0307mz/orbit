@@ -1,4 +1,4 @@
-// Theme: dark by default, light on request. The choice lives on <html data-theme> and in localStorage.
+// Theme: light by default, dark on request. The choice lives on <html data-theme> and in localStorage.
 // index.html sets the attribute before first paint with the same key and rule.
 export type Theme = 'dark' | 'light';
 export const THEME_KEY = 'orbit.theme';
@@ -13,7 +13,7 @@ export function readStoredTheme(): Theme | null {
 }
 
 export function currentTheme(): Theme {
-  return document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+  return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
 }
 
 export function applyTheme(t: Theme): void {

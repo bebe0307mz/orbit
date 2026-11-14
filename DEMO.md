@@ -1,33 +1,26 @@
-# Orbit demo: one budget, many agent keys
+# A shared budget, in 30 seconds
 
-**One sentence:** Orbit lets an agent business pay for work through NEAR while one vault enforces agent, workspace and company spending limits across the fleet.
+[Watch the actual app](evidence/demo.mp4). The clip uses the bright dashboard, concise captions and narration generated from a provided team voice model. No new payment is sent during the recording.
 
-## Record a 90-second judge cut
+## Reproduce the moment
 
-| Time | Screen and action | Say |
-| --- | --- | --- |
-| 0–10 s | Show the Agents dashboard with separate agent keys, two workspace budgets and one organization budget. | “An agent can pay for a job, but who stops its team or the whole fleet from overspending?” |
-| 10–35 s | Run `pnpm demo:agents audit --account near.testnet`. Show the HTTP 402 invoice, the agent's `pay` transaction, and the returned account data. Open the transaction link. If a live run stalls, show the [11 November verified run](evidence/testnet-fresh-audit-2026-11-11.json) and label it as recorded. | “Each agent holds a NEAR key limited to the vault's `pay` method. The merchant serves data only after it verifies the final vault payment.” |
-| 35–60 s | Show the recorded live workspace burst and run `node scripts/verify-workspace-burst.mjs`. Open one paid and one rejected transaction. | “Two pay-only agent keys raced 20 payments against one $1.50 operations budget. Fifteen settled and five were rejected on testnet.” The workspace is already at its cap, so replay the recorded run rather than claiming a second fresh burst. |
-| 60–80 s | Show the [recorded 11 November guardian pause](evidence/testnet-guardian-pause-2026-11-11.json), the [paused dashboard row](evidence/testnet-guardian-paused-dashboard.png), and the `agent_paused` rejection in Activity. The agent is already paused; label this as recorded. | “A separate guardian key stopped this agent. Its next payment was rejected on chain without a token transfer.” |
-| 80–90 s | Show the public repository's evidence index and the one-line status. | “The vault and 402 purchase work on testnet. The Agent Market seller worker is built, but a real marketplace assignment has not yet been completed.” |
+Start the dashboard with the public testnet source, using the normal repository setup:
 
-Use the version 1.1 testnet vault and open-mint test token (`otusd`, no monetary value). The paid diagnostic reads public NEAR RPC data; the synthetic quote endpoint should not appear in the hero clip. The workspace burst is a separate live testnet run, and the original organization-wide four-agent race remains a local sandbox run. Label their dates and environments.
+```sh
+VITE_SOURCE=rpc VITE_NETWORK=testnet VITE_VAULT_ACCOUNT_ID=orbit-ws-11a7-vault.testnet pnpm --filter @orbit/dashboard dev --host 127.0.0.1 --port 5184 --strictPort
+```
 
-## Prepare before recording
+Open `http://127.0.0.1:5184`.
 
-1. Follow [README.md](README.md#reproduce-on-testnet) to run the merchant, dashboard and testnet vault. Run `pnpm demo:agents market-check` separately if showing the private Agent Market draft; this is a read-only preflight, not a completed job.
-2. Keep the keychain, key files, credentials, account setup commands, and browser tabs containing secrets off screen. Use a clean browser profile and crop terminal prompts before publishing.
-3. Preload the dashboard and the exact testnet transaction explorer page. Record the transaction hash and payment ID so a judge can verify them from the repository's [evidence index](evidence/README.md).
-4. Rehearse twice with a stopwatch. Use captions for `402 → pay → 200`, `15 paid / 5 workspace rejections`, and `guardian pause` so the story works without sound.
-5. Record one continuous run of each proof. Edit for pace, and label any earlier recorded evidence with its date. If a live transaction stalls, show its final status only after it resolves; do not imply a pending payment settled.
+1. Click **Replay 20-payment race** (`#replayBurst`).
+2. See the exact recorded **15 paid / 5 blocked / $0 overspent** result. The shared cap is **$1.50 in no-value test-token units**.
+3. Click **Inspect a blocked payment** (`#inspectBlocked`). Open **View NEAR transaction** inside `#burstReceipt` to inspect the exact rejected transaction.
+4. The live dashboard below is separate from the recorded replay and states its own source. Its current totals can differ from the historical race.
 
-## If a real Agent Market job lands before submission
+The replay is derived from the committed [11 November workspace burst](evidence/testnet-workspace-burst-2026-11-11.json), not new network activity. Its precise fixture filename and complete proof instructions are in [evidence/README.md](evidence/README.md). The proof-fidelity test compares all 20 transaction hashes and outcomes with the original record. The animation timing is illustrative, not observed transaction arrival timing. Every dollar amount uses no-value test-token units, not real USD.
 
-Replace the first purchase scene with the actual buyer assignment → seller's Orbit expense → final diagnostic → marketplace submission. Show the assignment ID, Orbit payment ID, testnet transaction hash, and marketplace submission receipt together. Confirm all four before calling the marketplace workflow live. The seller draft must remain unpublished until the team approves publication.
+## Production notes
 
-## Public demo post draft for the human to publish
+The recording is actual app footage sampled about 10 times per second, encoded at 30 fps. Captions and narration were added. It contains no slides or fabricated payment screens. [Desktop](evidence/bright-desktop.jpg) and [390px phone check](evidence/bright-phone.jpg) show the new interface. Reduced motion is respected.
 
-> AI agents can spend faster than an operator can review every payment. We built Orbit at NEAR HACKATHON: one vault gives each agent a pay-only key and enforces agent, workspace and company budgets. An agent buys data through HTTP 402. Then two agent keys race 20 testnet payments against one workspace cap: 15 settle, five are rejected. All transactions are public. Test tokens have no value. Demo: [video] Code: [public repo]. @NEARProtocol #NEARHackathon
-
-Replace the placeholders and have a human publish the post. The public post and public repository are submission requirements in the [official guidance](https://nearhackathon.com/HACKATHON.md). Recheck that guidance before submitting.
+Build, TypeScript and 25 dashboard tests passed for this revision. Contract/backend code and key permissions were not changed. No transaction, publication or deployment was performed for this presentation update. See the main README for existing contract, administrator and marketplace limitations.

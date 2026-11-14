@@ -11,7 +11,7 @@ The original version 1.0 testnet vault remains available as earlier evidence. A 
 The [evidence index](evidence/README.md) records what has been observed, what was only tested with fixtures, and the remaining verification gates.
 The [architecture and security boundary](ARCHITECTURE.md) shows the payment path and each key's authority.
 
-For a short judge walkthrough, see the [90-second demo plan](DEMO.md).
+Watch the [30-second actual-app walkthrough](evidence/demo.mp4), or follow [DEMO.md](DEMO.md). The bright replay shows the 20 recorded testnet outcomes; it does not send new payments.
 
 ## Hackathon development window
 
@@ -241,3 +241,5 @@ The mainnet variant built from contract commit `183b59c` has SHA-256 `46d1350057
 - A paused agent's key can still pay transaction fees for rejected attempts. `orbit-cli status` warns when recent outcomes show attempts by a paused agent; revoke the key if they continue.
 - A stolen guardian key can only pause.
 - Known limits: a 24 hour window that spans UTC midnight can see up to two days of one agent's limit; a settle callback that fails leaves the payment reserved until an `upgrade` repairs it. Details: `contracts/vault/NOTES.md`.
+
+Presentation uses **GSAP 3.15.1** for brief transform/opacity animation, with reduced-motion support, under its [standard license](https://gsap.com/standard-license/). It does not determine chain state or payment outcomes.

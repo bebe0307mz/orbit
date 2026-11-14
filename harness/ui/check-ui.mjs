@@ -100,26 +100,26 @@ async function themePersistence() {
   page.on('pageerror', (e) => errors.push(String(e)));
   await page.goto(BASE + '#/agents');
   await page.waitForSelector('#themeToggle');
-  ok((await page.getAttribute('html', 'data-theme')) === 'dark', 'default theme is dark with nothing stored');
-  ok(/light/.test(await page.getAttribute('#themeToggle', 'aria-label')), 'toggle in dark offers light (moon icon)');
-  const bgDark = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+  ok((await page.getAttribute('html', 'data-theme')) === 'light', 'default theme is light with nothing stored');
+  ok(/dark/.test(await page.getAttribute('#themeToggle', 'aria-label')), 'toggle in light offers dark');
+  const bgInitial = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
   await page.click('#themeToggle');
-  ok((await page.getAttribute('html', 'data-theme')) === 'light', 'toggle switches to light');
-  ok((await page.evaluate(() => localStorage.getItem('orbit.theme'))) === 'light', 'choice stored in localStorage');
-  const bgLight = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
-  ok(bgDark !== bgLight && bgLight !== 'rgba(0, 0, 0, 0)', `background follows the theme (${bgDark} then ${bgLight})`);
+  ok((await page.getAttribute('html', 'data-theme')) === 'dark', 'toggle switches to dark');
+  ok((await page.evaluate(() => localStorage.getItem('orbit.theme'))) === 'dark', 'choice stored in localStorage');
+  const bgToggled = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+  ok(bgInitial !== bgToggled && bgToggled !== 'rgba(0, 0, 0, 0)', `background follows the theme (${bgInitial} then ${bgToggled})`);
   // the inline script sets the theme before React runs: check the attribute at DOMContentLoaded, before any app code
   await page.reload({ waitUntil: 'domcontentloaded' });
-  ok((await page.getAttribute('html', 'data-theme')) === 'light', 'theme persists across reload (set before first paint)');
+  ok((await page.getAttribute('html', 'data-theme')) === 'dark', 'theme persists across reload (set before first paint)');
   await page.waitForSelector('[data-check="vault.balance"]');
-  const layoutLight = await page.evaluate(() => [...document.querySelectorAll('.fig, table.t th')].map((e) => Math.round(e.getBoundingClientRect().left)).join(','));
+  const layoutBefore = await page.evaluate(() => [...document.querySelectorAll('.fig, table.t th')].map((e) => Math.round(e.getBoundingClientRect().left)).join(','));
   await page.click('#themeToggle');
-  const layoutDark = await page.evaluate(() => [...document.querySelectorAll('.fig, table.t th')].map((e) => Math.round(e.getBoundingClientRect().left)).join(','));
-  ok(layoutLight === layoutDark, 'no layout change between themes');
+  const layoutAfter = await page.evaluate(() => [...document.querySelectorAll('.fig, table.t th')].map((e) => Math.round(e.getBoundingClientRect().left)).join(','));
+  ok(layoutBefore === layoutAfter, 'no layout change between themes');
   // blocked storage: theme still toggles, nothing throws
   await page.evaluate(() => { Object.defineProperty(window, 'localStorage', { get() { throw new Error('blocked'); } }); });
   await page.click('#themeToggle');
-  ok((await page.getAttribute('html', 'data-theme')) === 'light', 'toggle works with storage blocked');
+  ok((await page.getAttribute('html', 'data-theme')) === 'dark', 'toggle works with storage blocked');
   ok(errors.length === 0, `zero page errors (${errors.join(' | ')})`);
   await ctx.close();
 }
